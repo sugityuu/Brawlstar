@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>BRAWL ARENA - ブロスタ風アクションシューティング（完全版）</title>
+    <title>BrawlArena</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=M+PLUS+Rounded+1c:wght@700;900&display=swap" rel="stylesheet">
     <style>
         * {
@@ -123,6 +124,11 @@
             background-color: #facc15;
             border-radius: 4px;
         }
+        input.allow-select {
+            user-select: text;
+            -webkit-user-select: text;
+            touch-action: manipulation;
+        }
 
         /* スマホ横画面（Landscape）専用の最適化レイアウト：画面見切れを完全に防止 */
         @media (orientation: landscape) and (max-height: 540px) {
@@ -185,10 +191,10 @@
         </button>
     </div>
 
-    <!-- ==================== ホーム画面（スターパーク・ロビー） ==================== -->
+    <!-- ==================== ホーム画面（ロビー） ==================== -->
     <div id="lobbyScreen" class="fixed inset-0 z-30 flex flex-col justify-between p-2.5 sm:p-4 landscape-compact-pad starr-bg overflow-y-auto custom-scrollbar">
 
-        <!-- ブロスタ本家風トップリソース＆トロフィーバー -->
+        <!-- トップリソース＆タイトル -->
         <div class="flex flex-col items-center">
             <div class="flex flex-wrap items-center justify-center gap-1.5 mb-0.5 pr-32 sm:pr-0">
                 <div class="bg-black/80 border-2 border-amber-400 rounded-full px-2 py-0.5 flex items-center gap-1 shadow">
@@ -212,12 +218,10 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-2">
-                <span class="bg-yellow-400 text-black font-black text-[9px] px-1.5 py-0.5 rounded-md border-2 border-black -rotate-6 shadow">STARR PARK</span>
-                <h1 class="brawl-font text-xl sm:text-3xl landscape-title text-yellow-400 text-stroke tracking-wider text-center">
-                    BRAWL ARENA
+            <div class="flex items-center justify-center">
+                <h1 class="brawl-font text-2xl sm:text-4xl landscape-title text-yellow-400 text-stroke tracking-wider text-center">
+                    BrawlArena
                 </h1>
-                <span class="bg-fuchsia-600 text-white font-black text-[9px] px-1.5 py-0.5 rounded-md border-2 border-black rotate-6 shadow">NAJIA &amp; DEV</span>
             </div>
         </div>
 
@@ -309,14 +313,17 @@
             </div>
         </div>
 
-        <!-- 2. バトル種別（通常5モード / ガチバトル） -->
+        <!-- 2. バトル種別（通常5モード / ガチバトル / 友達とオンライン対戦P2P） -->
         <div class="max-w-6xl w-full mx-auto">
-            <div class="flex justify-center gap-2 mb-1">
-                <button id="btnQueueNormal" type="button" class="brawl-btn bg-gradient-to-r from-sky-400 to-blue-600 text-white font-black text-[11px] sm:text-xs px-3 py-1 rounded-xl cursor-pointer ring-2 ring-yellow-300">
+            <div class="flex flex-wrap justify-center gap-1.5 sm:gap-2 mb-1">
+                <button id="btnQueueNormal" type="button" class="brawl-btn bg-gradient-to-r from-sky-400 to-blue-600 text-white font-black text-[11px] sm:text-xs px-2.5 sm:px-3 py-1 rounded-xl cursor-pointer ring-2 ring-yellow-300">
                     🎮 通常バトル（全5イベント）
                 </button>
-                <button id="btnQueueRanked" type="button" class="brawl-btn bg-gradient-to-r from-rose-700 to-red-900 text-slate-200 font-black text-[11px] sm:text-xs px-3 py-1 rounded-xl cursor-pointer opacity-80">
+                <button id="btnQueueRanked" type="button" class="brawl-btn bg-gradient-to-r from-rose-700 to-red-900 text-slate-200 font-black text-[11px] sm:text-xs px-2.5 sm:px-3 py-1 rounded-xl cursor-pointer opacity-80">
                     👑 ガチバトル（RANKED 3vs3）
+                </button>
+                <button id="btnQueueOnline" type="button" class="brawl-btn bg-gradient-to-r from-emerald-500 to-teal-700 text-white font-black text-[11px] sm:text-xs px-2.5 sm:px-3 py-1 rounded-xl cursor-pointer opacity-80">
+                    🌐 オンライン対戦（友達とP2P）
                 </button>
             </div>
 
@@ -366,6 +373,62 @@
                 <div class="brawl-card bg-gradient-to-r from-red-900 via-rose-950 to-amber-950 rounded-xl p-2 text-center border-yellow-400">
                     <div class="text-xs font-black text-yellow-300 text-stroke-sm">
                         👑 ガチバトル（RANKED 3vs3） — 勝利で +100 RP ＆トロフィー獲得！
+                    </div>
+                </div>
+            </div>
+
+            <!-- オンライン対戦（サーバー不要 P2P WebRTC）パネル -->
+            <div id="onlineLobbyWrapper" class="hidden mb-1">
+                <div class="brawl-card bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 rounded-xl p-2 sm:p-2.5 border-emerald-400">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 items-center">
+                        <!-- ホスト側：ルーム作成 -->
+                        <div class="bg-black/50 border border-emerald-500/40 rounded-xl p-2 flex flex-col gap-1">
+                            <div class="flex items-center justify-between gap-1">
+                                <span class="text-[11px] font-black text-emerald-300">🏠 ルームを作る（ホスト）</span>
+                                <div class="flex gap-1">
+                                    <select id="onlineFormatSelect" class="bg-slate-800 text-white text-[10px] font-black px-1.5 py-0.5 rounded border border-black">
+                                        <option value="1v1">1vs1 タイマン</option>
+                                        <option value="2v2">2vs2 (＋AIボット)</option>
+                                    </select>
+                                    <select id="onlineModeSelect" class="bg-slate-800 text-white text-[10px] font-black px-1.5 py-0.5 rounded border border-black">
+                                        <option value="knockout">🥊 ノックアウト</option>
+                                        <option value="gemgrab">💎 エメラルドハント</option>
+                                        <option value="brawlball">⚽ ブロストライカー</option>
+                                        <option value="hotzone">🚩 ホットゾーン</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button id="btnCreateRoom" type="button" class="brawl-btn bg-emerald-400 hover:bg-emerald-300 text-black font-black text-xs px-2.5 py-1 rounded-lg cursor-pointer whitespace-nowrap">
+                                    合言葉を発行
+                                </button>
+                                <div id="hostRoomCodeBox" class="flex-1 bg-slate-900 border border-emerald-400/60 rounded-lg px-2 py-1 text-center font-black text-sm tracking-widest text-yellow-300">
+                                    -----
+                                </div>
+                                <button id="btnCopyRoomCode" type="button" class="brawl-btn bg-slate-700 hover:bg-slate-600 text-white font-black text-[10px] px-2 py-1 rounded-lg cursor-pointer">
+                                    コピー
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- ゲスト側：合言葉入力して参加 -->
+                        <div class="bg-black/50 border border-cyan-500/40 rounded-xl p-2 flex flex-col gap-1">
+                            <div class="text-[11px] font-black text-cyan-300">🚀 友達のルームに参加（ゲスト）</div>
+                            <div class="flex items-center gap-1.5">
+                                <input id="guestRoomInput" type="text" maxlength="8" placeholder="合言葉を入力 (例: A7K9P)" class="allow-select flex-1 bg-slate-900 border-2 border-cyan-400/70 rounded-lg px-2.5 py-1 text-center font-black text-sm uppercase tracking-widest text-white focus:outline-none focus:border-yellow-300">
+                                <button id="btnJoinRoom" type="button" class="brawl-btn bg-cyan-400 hover:bg-cyan-300 text-black font-black text-xs px-3 py-1 rounded-lg cursor-pointer whitespace-nowrap">
+                                    接続・参加
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between mt-1.5 px-1">
+                        <span id="onlineStatusText" class="text-[10px] sm:text-xs font-black text-amber-300">
+                            📡 サーバー不要のP2P直接通信：合言葉を共有して友達とすぐ対戦できます！
+                        </span>
+                        <button id="btnDisconnectP2P" type="button" class="hidden text-[10px] font-black text-red-400 underline cursor-pointer">
+                            切断する
+                        </button>
                     </div>
                 </div>
             </div>
@@ -423,8 +486,11 @@
             <div id="rankedMatchTag" class="hidden bg-gradient-to-r from-red-600 via-amber-500 to-red-600 text-black font-black text-[10px] px-2.5 py-0.5 rounded-full border-2 border-black shadow">
                 👑 RANKED MATCH / ガチバトル
             </div>
+            <div id="onlineMatchTag" class="hidden bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 text-black font-black text-[10px] px-2.5 py-0.5 rounded-full border-2 border-black shadow">
+                🌐 ONLINE P2P MATCH
+            </div>
 
-            <!-- エメラルドハントHUD（各メンバーのエメラルド所持数バッジも表示） -->
+            <!-- エメラルドハントHUD -->
             <div id="hudGemGrab" class="hidden flex flex-col items-center gap-1">
                 <div class="flex items-center gap-3 bg-black/85 border-2 border-black px-3.5 py-1 rounded-2xl shadow-lg">
                     <div class="flex items-center gap-1.5">
@@ -518,7 +584,7 @@
         <!-- 中央大型演出バナー -->
         <div id="centerSplash" class="hidden fixed inset-0 flex flex-col items-center justify-center pointer-events-none z-30">
             <div id="centerSplashSub" class="hidden bg-black/80 text-yellow-300 font-black text-xs sm:text-base px-4 py-1 rounded-full border-2 border-yellow-400 mb-2">
-                RANKED MATCH
+                BRAWL ARENA
             </div>
             <div id="centerSplashText" class="brawl-font text-4xl sm:text-7xl text-yellow-400 text-stroke tracking-wider text-center px-4">
                 3
@@ -547,11 +613,11 @@
             </div>
         </div>
 
-        <!-- 2. 右下アクション操作（スマホ横画面でも見切れない最適スケール＆セーフエリア配置） -->
+        <!-- 2. 右下アクション操作 -->
         <div class="pointer-events-auto fixed bottom-3 right-3 flex items-end gap-2 sm:gap-3 z-20 landscape-controls-scale" style="right: max(12px, env(safe-area-inset-right));">
             <!-- 紫のハイパーチャージボタン -->
             <div class="flex flex-col items-center">
-                <button id="hyperBtnZone" type="button" class="relative w-13 h-13 sm:w-15 sm:h-15 rounded-full bg-slate-800/90 border-2 border-black flex items-center justify-center shadow-xl cursor-pointer active:scale-95 transition-transform" style="width: 3.3rem; height: 3.3rem;">
+                <button id="hyperBtnZone" type="button" class="relative rounded-full bg-slate-800/90 border-2 border-black flex items-center justify-center shadow-xl cursor-pointer active:scale-95 transition-transform" style="width: 3.3rem; height: 3.3rem;">
                     <svg class="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
                         <circle cx="50" cy="50" r="43" fill="none" stroke="#1e1b4b" stroke-width="11"/>
                         <circle id="hyperRing" cx="50" cy="50" r="43" fill="none" stroke="#d946ef" stroke-width="11" stroke-dasharray="270.18" stroke-dashoffset="270.18" stroke-linecap="round"/>
@@ -596,7 +662,7 @@
         </div>
     </div>
 
-    <!-- ==================== ブロスタ本家風 斜め分割リザルト画面 ==================== -->
+    <!-- ==================== 斜め分割リザルト画面 ==================== -->
     <div id="resultScreen" class="hidden fixed inset-0 z-40 overflow-y-auto custom-scrollbar select-none">
         <div id="resultSplitBg" class="min-h-full w-full brawl-result-split-win flex flex-col justify-between p-2.5 sm:p-5 relative">
             <canvas id="resultFxCanvas" class="fixed inset-0 pointer-events-none z-0"></canvas>
@@ -638,7 +704,7 @@
                 </div>
             </div>
 
-            <!-- 中央：3v3 チーム6人ショーケース（横画面でも左右並べて見切れない） -->
+            <!-- 中央：チームショーケース -->
             <div id="result3v3Showcase" class="relative z-10 grid grid-cols-2 gap-2 sm:gap-5 items-end my-auto w-full max-w-7xl mx-auto py-1">
                 <div id="blueTeamShowcaseGrid" class="grid grid-cols-3 gap-1 sm:gap-2 items-end"></div>
                 <div id="redTeamShowcaseGrid" class="grid grid-cols-3 gap-1 sm:gap-2 items-end"></div>
@@ -684,12 +750,7 @@
     <script>
     /**
      * ============================================================================
-     * BRAWL ARENA - 完全アップグレード版
-     * 1. 攻撃力下方修正（約40%〜45%ダウン）で即死しない白熱の撃ち合いバランスを実現
-     * 2. ホットゾーンゲージ速度を緩やかに調整＆エメラルド排出間隔11.5秒・所持数頭上＆HUD可視化
-     * 3. 新ブロウラー「ナジア（Najia）」＆開発者専用キャラ「スパイク改」完全実装
-     * 4. レオンのウルト透明時間7.0秒・ガジェット回数制限撤廃（クールダウン制のみ）
-     * 5. スマホ横画面完全対応（100dvh・見切れ防止）＆camera.zoom自動補正・マップ端クランプ
+     * BrawlArena - サーバー不要P2Pオンライン対戦＆スマートボットAI搭載完全版
      * ============================================================================
      */
     (() => {
@@ -699,22 +760,22 @@
         // 1. ランク階級テーブル＆プロフィールストレージ
         // ========================================================================
         const RANK_TIERS = [
-            { min: 0,    name: '🥉 ブロンズ I',      aiScale: 0.85 },
-            { min: 100,  name: '🥉 ブロンズ II',     aiScale: 0.89 },
-            { min: 200,  name: '🥉 ブロンズ III',    aiScale: 0.93 },
-            { min: 300,  name: '🥈 シルバー I',      aiScale: 0.97 },
-            { min: 450,  name: '🥈 シルバー II',    aiScale: 1.00 },
-            { min: 600,  name: '🥈 シルバー III',    aiScale: 1.03 },
-            { min: 750,  name: '🥇 ゴールド I',      aiScale: 1.06 },
-            { min: 950,  name: '🥇 ゴールド II',     aiScale: 1.09 },
-            { min: 1150, name: '🥇 ゴールド III',    aiScale: 1.12 },
-            { min: 1350, name: '💎 ダイヤモンド I',  aiScale: 1.15 },
-            { min: 1600, name: '💎 ダイヤモンド II', aiScale: 1.18 },
-            { min: 1850, name: '💎 ダイヤモンド III',aiScale: 1.21 },
-            { min: 2100, name: '🟣 レジェンド I',    aiScale: 1.25 },
-            { min: 2400, name: '🟣 レジェンド II',   aiScale: 1.29 },
-            { min: 2700, name: '🟣 レジェンド III',  aiScale: 1.33 },
-            { min: 3000, name: '👑 マスター',        aiScale: 1.38 }
+            { min: 0,    name: '🥉 ブロンズ I',      aiScale: 0.92 },
+            { min: 100,  name: '🥉 ブロンズ II',     aiScale: 0.95 },
+            { min: 200,  name: '🥉 ブロンズ III',    aiScale: 0.98 },
+            { min: 300,  name: '🥈 シルバー I',      aiScale: 1.00 },
+            { min: 450,  name: '🥈 シルバー II',    aiScale: 1.03 },
+            { min: 600,  name: '🥈 シルバー III',    aiScale: 1.06 },
+            { min: 750,  name: '🥇 ゴールド I',      aiScale: 1.09 },
+            { min: 950,  name: '🥇 ゴールド II',     aiScale: 1.12 },
+            { min: 1150, name: '🥇 ゴールド III',    aiScale: 1.15 },
+            { min: 1350, name: '💎 ダイヤモンド I',  aiScale: 1.18 },
+            { min: 1600, name: '💎 ダイヤモンド II', aiScale: 1.21 },
+            { min: 1850, name: '💎 ダイヤモンド III',aiScale: 1.24 },
+            { min: 2100, name: '🟣 レジェンド I',    aiScale: 1.28 },
+            { min: 2400, name: '🟣 レジェンド II',   aiScale: 1.32 },
+            { min: 2700, name: '🟣 レジェンド III',  aiScale: 1.36 },
+            { min: 3000, name: '👑 マスター',        aiScale: 1.40 }
         ];
 
         let profile = { matches: 0, wins: 0, kills: 0, rp: 0, trophies: 0, coins: 1250, powerPoints: 480 };
@@ -802,7 +863,7 @@
                     filter.type = 'lowpass';
                     filter.frequency.value = filterFreq;
                     const gain = this.ctx.createGain();
-                    const now = this.ctx.currentTime;
+                    const now = this.ctx.createTime;
                     gain.gain.setValueAtTime(volume, now);
                     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
                     noise.connect(filter);
@@ -905,7 +966,7 @@
         const sound = new SoundEngine();
 
         // ========================================================================
-        // 3. キャラクター定義（全9体・即死防止のバランス調整済み）
+        // 3. キャラクター定義（全9体）
         // ========================================================================
         const BRAWLERS = {
             shelly: {
@@ -950,14 +1011,12 @@
                 superChargePerHit: 0.18, aimType: 'line', color: '#0d9488',
                 gadgetName: 'クローンプロジェクター', gadgetDesc: '分身デコイを召喚！', gadgetCd: 8.5, gadgetIcon: '👥'
             },
-            // 新ブロウラー「ナジア（Najia）」：黄金のコブラ杖を持つ毒蛇使い
             najia: {
                 id: 'najia', name: 'ナジア', maxHp: 6000, speed: 148, reloadTime: 1.35, maxAmmo: 3,
                 range: 470, spread: 0.16, pellets: 2, damagePerPellet: 540, bulletSpeed: 500, bulletRadius: 7,
                 superChargePerHit: 0.16, aimType: 'cone', color: '#84cc16', isPoison: true,
                 gadgetName: 'サーペントステップ', gadgetDesc: '高速ステップ回避＋足元に毒トラップ設置！', gadgetCd: 8.5, gadgetIcon: '🐍'
             },
-            // 開発者専用キャラ「スパイク改」：常時70%軽減シールド・壁越え放物線ランダム無数分裂弾・広範囲味方回復
             spike_kai: {
                 id: 'spike_kai', name: 'スパイク改', maxHp: 5400, speed: 132, reloadTime: 1.5, maxAmmo: 3,
                 range: 480, spread: 0.0, pellets: 1, damagePerPellet: 640, bulletSpeed: 460, bulletRadius: 11,
@@ -1101,7 +1160,6 @@
                 ctx.fillStyle = '#fef08a'; ctx.beginPath(); ctx.arc(0, 0, radius * 0.45, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
                 ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(-radius * 0.2, 0, radius * 0.22, 0, Math.PI * 2); ctx.fill();
             } else if (type === 'spike_kai') {
-                // 開発者専用「スパイク改」：黄金のトゲボディ＆王冠エンブレム
                 ctx.fillStyle = '#15803d'; ctx.beginPath(); ctx.arc(0, 0, radius * 0.9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
                 ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.arc(0, 0, radius * 0.56, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
                 ctx.fillStyle = '#fef08a';
@@ -1128,7 +1186,6 @@
                 ctx.fillStyle = '#14b8a6'; ctx.beginPath(); ctx.arc(0, 0, radius * 0.65, -Math.PI * 0.7, Math.PI * 0.7); ctx.fill(); ctx.stroke();
                 ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.arc(radius * 0.35, -radius * 0.25, radius * 0.14, 0, Math.PI * 2); ctx.arc(radius * 0.35, radius * 0.25, radius * 0.14, 0, Math.PI * 2); ctx.fill();
             } else if (type === 'najia') {
-                // 新ブロウラー「ナジア（Najia）」：エメラルドフード＆黄金のコブラ杖
                 ctx.fillStyle = '#047857'; ctx.beginPath(); ctx.arc(0, 0, radius * 0.88, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
                 ctx.fillStyle = '#facc15'; ctx.fillRect(radius * 0.15, radius * 0.36, radius * 1.25, radius * 0.22); ctx.strokeRect(radius * 0.15, radius * 0.36, radius * 1.25, radius * 0.22);
                 ctx.fillStyle = '#84cc16'; ctx.beginPath(); ctx.arc(radius * 1.38, radius * 0.47, radius * 0.24, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
@@ -1172,7 +1229,406 @@
         }
 
         // ========================================================================
-        // 4. ゲーム状態・ギミックマップ・モード管理
+        // 4. サーバー不要 P2P オンライン対戦ネットワークマネージャー（PeerJS）
+        // ========================================================================
+        const net = {
+            active: false,
+            role: 'offline', // 'offline' | 'host' | 'guest'
+            peer: null,
+            conn: null,
+            roomCode: '',
+            connected: false,
+            guestBrawler: 'shelly',
+            onlineFormat: '1v1', // '1v1' | '2v2'
+            onlineMode: 'knockout',
+            guestInput: { ix: 0, iy: 0, facing: Math.PI / 2 },
+            syncTimer: 0,
+            inputSendTimer: 0,
+            guestSnapshot: null
+        };
+
+        function generateShortRoomCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random() * chars.length)];
+            return code;
+        }
+
+        function setOnlineStatus(msg, colorClass = 'text-amber-300') {
+            const el = document.getElementById('onlineStatusText');
+            if (!el) return;
+            el.textContent = msg;
+            el.className = `text-[10px] sm:text-xs font-black ${colorClass}`;
+        }
+
+        function cleanupP2P(silent = false) {
+            if (net.conn) {
+                try { net.conn.close(); } catch (e) {}
+                net.conn = null;
+            }
+            if (net.peer) {
+                try { net.peer.destroy(); } catch (e) {}
+                net.peer = null;
+            }
+            net.active = false;
+            net.role = 'offline';
+            net.connected = false;
+            net.roomCode = '';
+            net.guestSnapshot = null;
+            document.getElementById('hostRoomCodeBox').textContent = '-----';
+            document.getElementById('btnDisconnectP2P').classList.add('hidden');
+            if (!silent) {
+                setOnlineStatus('📡 サーバー不要のP2P直接通信：合言葉を共有して友達とすぐ対戦できます！', 'text-amber-300');
+            }
+        }
+
+        function setupDataChannelHandlers(conn, isHost) {
+            net.conn = conn;
+            conn.on('open', () => {
+                net.connected = true;
+                net.active = true;
+                document.getElementById('btnDisconnectP2P').classList.remove('hidden');
+                if (isHost) {
+                    setOnlineStatus(`✅ 友達が接続しました！下の「PLAY」を押すと対戦開始！`, 'text-emerald-300');
+                    sound.playGoal();
+                    conn.send({
+                        type: 'HELLO_HOST',
+                        brawler: selectedBrawler,
+                        format: document.getElementById('onlineFormatSelect').value,
+                        mode: document.getElementById('onlineModeSelect').value
+                    });
+                } else {
+                    setOnlineStatus(`✅ ホストに接続完了！ホストが「PLAY」を押すのを待機中...`, 'text-cyan-300');
+                    sound.playGoal();
+                    conn.send({ type: 'HELLO_GUEST', brawler: selectedBrawler });
+                }
+            });
+
+            conn.on('data', (msg) => {
+                if (!msg || typeof msg !== 'object') return;
+                if (msg.type === 'HELLO_GUEST' && isHost) {
+                    net.guestBrawler = BRAWLERS[msg.brawler] ? msg.brawler : 'shelly';
+                    setOnlineStatus(`✅ 友達（${BRAWLERS[net.guestBrawler].name}）が参加中！「PLAY」で開始！`, 'text-emerald-300');
+                } else if (msg.type === 'HELLO_HOST' && !isHost) {
+                    net.onlineFormat = msg.format || '1v1';
+                    net.onlineMode = msg.mode || 'knockout';
+                    setOnlineStatus(`✅ ホスト（${BRAWLERS[msg.brawler]?.name || '相手'}）と接続済み！開始待機中...`, 'text-cyan-300');
+                } else if (msg.type === 'START_MATCH' && !isHost) {
+                    startGuestMatchFromHost(msg);
+                } else if (msg.type === 'GUEST_INPUT' && isHost) {
+                    net.guestInput.ix = Number(msg.ix) || 0;
+                    net.guestInput.iy = Number(msg.iy) || 0;
+                    if (typeof msg.facing === 'number') net.guestInput.facing = msg.facing;
+                } else if (msg.type === 'GUEST_ACTION' && isHost) {
+                    const guestFighter = entities.find(e => e.id === 'guest_player');
+                    if (guestFighter && guestFighter.alive && gameState === 'PLAYING') {
+                        if (msg.action === 'attack') executeAttack(guestFighter, msg.angle, false, msg.dist);
+                        else if (msg.action === 'super') executeAttack(guestFighter, msg.angle, true, msg.dist);
+                        else if (msg.action === 'gadget') activateGadget(guestFighter);
+                        else if (msg.action === 'hyper') activateHypercharge(guestFighter);
+                    }
+                } else if (msg.type === 'STATE_SNAPSHOT' && !isHost) {
+                    applyHostSnapshot(msg);
+                } else if (msg.type === 'MATCH_OVER' && !isHost) {
+                    const iWon = (msg.winnerTeam === 'red');
+                    endMatch(iWon, msg.subText || (iWon ? 'オンライン対戦 勝利！' : 'オンライン対戦 敗北...'));
+                }
+            });
+
+            conn.on('close', () => {
+                const wasPlaying = (gameState === 'PLAYING' || gameState === 'COUNTDOWN' || gameState === 'ROUND_OVER');
+                cleanupP2P(true);
+                setOnlineStatus('⚠️ 相手とのP2P接続が切断されました', 'text-red-400');
+                if (wasPlaying) {
+                    endMatch(true, '相手が切断したため不戦勝となりました');
+                }
+            });
+
+            conn.on('error', () => {
+                setOnlineStatus('⚠️ 通信エラーが発生しました。もう一度お試しください', 'text-red-400');
+            });
+        }
+
+        function createOnlineRoom() {
+            sound.init();
+            sound.playClick();
+            if (typeof Peer === 'undefined') {
+                setOnlineStatus('⚠️ P2P通信ライブラリの読み込みに失敗しました。ネット接続を確認してください', 'text-red-400');
+                return;
+            }
+            cleanupP2P(true);
+            const code = generateShortRoomCode();
+            net.role = 'host';
+            net.roomCode = code;
+            document.getElementById('hostRoomCodeBox').textContent = code;
+            setOnlineStatus(`⏳ ルーム「${code}」を作成中...`, 'text-amber-300');
+
+            try {
+                const peer = new Peer(`brawlarena_${code}`, { debug: 0 });
+                net.peer = peer;
+                peer.on('open', () => {
+                    setOnlineStatus(`📡 合言葉【 ${code} 】を友達に教えてください（接続待機中...）`, 'text-emerald-300');
+                });
+                peer.on('connection', (conn) => {
+                    if (net.conn && net.connected) {
+                        conn.close();
+                        return;
+                    }
+                    setupDataChannelHandlers(conn, true);
+                });
+                peer.on('error', (err) => {
+                    if (err && err.type === 'unavailable-id') {
+                        createOnlineRoom();
+                    } else {
+                        setOnlineStatus(`⚠️ 接続エラー: ${err?.type || '再試行してください'}`, 'text-red-400');
+                    }
+                });
+            } catch (e) {
+                setOnlineStatus('⚠️ ルーム作成に失敗しました', 'text-red-400');
+            }
+        }
+
+        function joinOnlineRoom() {
+            sound.init();
+            sound.playClick();
+            if (typeof Peer === 'undefined') {
+                setOnlineStatus('⚠️ P2P通信ライブラリの読み込みに失敗しました', 'text-red-400');
+                return;
+            }
+            const raw = (document.getElementById('guestRoomInput').value || '').trim().toUpperCase();
+            if (raw.length < 4) {
+                setOnlineStatus('⚠️ ホストから聞いた5文字の合言葉を入力してください', 'text-red-400');
+                return;
+            }
+            cleanupP2P(true);
+            net.role = 'guest';
+            net.roomCode = raw;
+            setOnlineStatus(`⏳ ルーム「${raw}」へ接続中...`, 'text-cyan-300');
+
+            try {
+                const peer = new Peer({ debug: 0 });
+                net.peer = peer;
+                peer.on('open', () => {
+                    const conn = peer.connect(`brawlarena_${raw}`, { reliable: false });
+                    setupDataChannelHandlers(conn, false);
+                });
+                peer.on('error', (err) => {
+                    setOnlineStatus(`⚠️ ルームが見つかりません（合言葉を確認してください）`, 'text-red-400');
+                });
+            } catch (e) {
+                setOnlineStatus('⚠️ 接続に失敗しました', 'text-red-400');
+            }
+        }
+
+        function broadcastHostSnapshot() {
+            if (!net.active || net.role !== 'host' || !net.conn || !net.connected) return;
+            const payload = {
+                type: 'STATE_SNAPSHOT',
+                gs: gameState,
+                splashText: document.getElementById('centerSplashText')?.textContent || '',
+                splashVisible: !document.getElementById('centerSplash')?.classList.contains('hidden'),
+                bbBlueScore,
+                bbRedScore,
+                hzBlueProgress: Math.floor(hzBlueProgress),
+                hzRedProgress: Math.floor(hzRedProgress),
+                koBlueWins,
+                koRedWins,
+                koRoundTimer: Math.ceil(koRoundTimer),
+                poisonRadius: Math.round(poisonRadius),
+                ball: soccerBall ? { x: Math.round(soccerBall.x), y: Math.round(soccerBall.y), sk: soccerBall.superKick } : null,
+                items: items.map(it => ({ t: it.type, x: Math.round(it.x), y: Math.round(it.y) })),
+                entities: entities.map(e => ({
+                    id: e.id,
+                    name: e.name,
+                    team: e.team,
+                    brawler: e.brawler,
+                    x: Math.round(e.x),
+                    y: Math.round(e.y),
+                    facing: Number(e.facing.toFixed(2)),
+                    hp: e.hp,
+                    maxHp: e.maxHp,
+                    ammo: Number(e.ammo.toFixed(1)),
+                    sc: Number(e.superCharge.toFixed(2)),
+                    hc: Number(e.hyperCharge.toFixed(2)),
+                    ht: Number(e.hyperTimer.toFixed(1)),
+                    gcd: Number(e.gadgetCooldown.toFixed(1)),
+                    gems: e.gems,
+                    alive: e.alive,
+                    jumping: e.jumping,
+                    st: Number(e.stealthTimer.toFixed(1)),
+                    sh: Number(e.spawnShieldTimer.toFixed(1)),
+                    kills: e.kills,
+                    deaths: e.deaths,
+                    dmg: e.damageDealt
+                })),
+                bullets: bullets.slice(0, 60).map(b => ({
+                    x: Math.round(b.x),
+                    y: Math.round(b.y),
+                    r: b.radius,
+                    c: b.color
+                })),
+                lobs: lobProjectiles.map(lp => ({
+                    x: Math.round(lp.x),
+                    y: Math.round(lp.y),
+                    p: Number((lp.elapsed / lp.duration).toFixed(2)),
+                    ah: Math.round(lp.arcHeight)
+                }))
+            };
+            try { net.conn.send(payload); } catch (e) {}
+        }
+
+        function applyHostSnapshot(snap) {
+            if (!snap) return;
+            gameState = snap.gs || 'PLAYING';
+            const splash = document.getElementById('centerSplash');
+            const splashText = document.getElementById('centerSplashText');
+            if (snap.splashVisible) {
+                splash.classList.remove('hidden');
+                splashText.textContent = snap.splashText;
+            } else {
+                splash.classList.add('hidden');
+            }
+
+            bbBlueScore = snap.bbBlueScore || 0;
+            bbRedScore = snap.bbRedScore || 0;
+            hzBlueProgress = snap.hzBlueProgress || 0;
+            hzRedProgress = snap.hzRedProgress || 0;
+            koBlueWins = snap.koBlueWins || 0;
+            koRedWins = snap.koRedWins || 0;
+            koRoundTimer = snap.koRoundTimer || 60;
+            if (snap.poisonRadius) poisonRadius = snap.poisonRadius;
+
+            // ゲスト視点では赤チームが自分側なので、スコア表示を自分基準に反転して表示
+            if (activeMode === 'brawlball') {
+                document.getElementById('bbBlueScore').textContent = bbRedScore;
+                document.getElementById('bbRedScore').textContent = bbBlueScore;
+            } else if (activeMode === 'hotzone') {
+                document.getElementById('hzBluePct').textContent = hzRedProgress;
+                document.getElementById('hzRedPct').textContent = hzBlueProgress;
+            } else if (activeMode === 'knockout') {
+                document.getElementById('koTimer').textContent = koRoundTimer;
+                document.getElementById('koBlueAlive').textContent = (snap.entities || []).filter(e => e.team === 'red' && e.alive).length;
+                document.getElementById('koRedAlive').textContent = (snap.entities || []).filter(e => e.team === 'blue' && e.alive).length;
+            } else if (activeMode === 'gemgrab') {
+                const myGems = (snap.entities || []).filter(e => e.team === 'red' && e.alive).reduce((s, e) => s + (e.gems || 0), 0);
+                const oppGems = (snap.entities || []).filter(e => e.team === 'blue' && e.alive).reduce((s, e) => s + (e.gems || 0), 0);
+                document.getElementById('blueGems').textContent = myGems;
+                document.getElementById('redGems').textContent = oppGems;
+            }
+
+            if (snap.ball && soccerBall) {
+                soccerBall.x = snap.ball.x;
+                soccerBall.y = snap.ball.y;
+                soccerBall.superKick = snap.ball.sk;
+            }
+            if (Array.isArray(snap.items)) {
+                items = snap.items.map(it => ({ type: it.t, x: it.x, y: it.y, bob: globalAnimTime * 4 }));
+            }
+
+            if (Array.isArray(snap.entities)) {
+                const seenIds = new Set();
+                for (const se of snap.entities) {
+                    seenIds.add(se.id);
+                    let f = entities.find(x => x.id === se.id);
+                    if (!f) {
+                        f = createFighter({
+                            id: se.id,
+                            name: se.id === 'guest_player' ? 'あなた' : (se.id === 'player' ? 'ホスト' : se.name),
+                            isPlayer: se.id === 'guest_player',
+                            team: se.team,
+                            brawler: se.brawler,
+                            x: se.x,
+                            y: se.y,
+                            facing: se.facing
+                        });
+                        entities.push(f);
+                    }
+                    f.targetNetX = se.x;
+                    f.targetNetY = se.y;
+                    f.facing = se.facing;
+                    f.hp = se.hp;
+                    f.maxHp = se.maxHp;
+                    f.ammo = se.ammo;
+                    f.superCharge = se.sc;
+                    f.hyperCharge = se.hc;
+                    f.hyperTimer = se.ht;
+                    f.gadgetCooldown = se.gcd;
+                    f.gems = se.gems;
+                    f.alive = se.alive;
+                    f.jumping = se.jumping;
+                    f.stealthTimer = se.st;
+                    f.spawnShieldTimer = se.sh;
+                    f.kills = se.kills;
+                    f.deaths = se.deaths;
+                    f.damageDealt = se.dmg;
+                }
+                entities = entities.filter(e => seenIds.has(e.id));
+            }
+
+            if (Array.isArray(snap.bullets)) {
+                bullets = snap.bullets.map(sb => ({
+                    x: sb.x, y: sb.y, radius: sb.r, color: sb.c, vx: 0, vy: 0, trail: []
+                }));
+            }
+            if (Array.isArray(snap.lobs)) {
+                lobProjectiles = snap.lobs.map(sl => ({
+                    x: sl.x, y: sl.y, elapsed: sl.p, duration: 1, arcHeight: sl.ah, spin: globalAnimTime * 12
+                }));
+            }
+
+            const me = getPlayer();
+            if (me) {
+                updateGadgetHUD(me);
+                updateHyperchargeHUD(me);
+                document.getElementById('deadOverlayPanel').classList.toggle('hidden', me.alive);
+                if (!me.alive) {
+                    document.getElementById('deadOverlayTitle').textContent = '倒された！';
+                    document.getElementById('deadOverlaySub').textContent = '復活またはラウンド終了待機中...';
+                }
+            }
+        }
+
+        function startGuestMatchFromHost(msg) {
+            activeMode = msg.mode || 'knockout';
+            isRankedMatch = false;
+            matchTime = 0;
+            entities = [];
+            bullets = [];
+            lobProjectiles = [];
+            items = [];
+            particles = [];
+            shockwaves = [];
+            confettiParticles = [];
+            floatingTexts = [];
+            slowZones = [];
+            healingCacti = [];
+            poisonRadius = Math.hypot(MAP_W / 2, MAP_H / 2) * 0.96;
+            stats = { kills: 0, deaths: 0, damage: 0, rank: 1 };
+
+            generateMap(activeMode);
+
+            document.getElementById('lobbyScreen').classList.add('hidden');
+            document.getElementById('resultScreen').classList.add('hidden');
+            document.getElementById('topRightGlobalControls').classList.remove('hidden');
+            document.getElementById('battleHud').classList.remove('hidden');
+            document.getElementById('btnQuit').classList.remove('hidden');
+            document.getElementById('rankedMatchTag').classList.add('hidden');
+            document.getElementById('onlineMatchTag').classList.remove('hidden');
+
+            document.getElementById('hudGemGrab').classList.toggle('hidden', activeMode !== 'gemgrab');
+            document.getElementById('hudBrawlBall').classList.toggle('hidden', activeMode !== 'brawlball');
+            document.getElementById('hudHotZone').classList.toggle('hidden', activeMode !== 'hotzone');
+            document.getElementById('hudKnockout').classList.toggle('hidden', activeMode !== 'knockout');
+            document.getElementById('hudShowdown').classList.add('hidden');
+
+            const spec = BRAWLERS[selectedBrawler];
+            if (spec) document.getElementById('gadgetIcon').textContent = spec.gadgetIcon;
+            camera.zoom = computeOptimalCameraZoom();
+            gameState = 'COUNTDOWN';
+        }
+
+        // ========================================================================
+        // 5. ゲーム状態・ギミックマップ・モード管理
         // ========================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -1214,7 +1670,7 @@
 
         let entities = [];
         let bullets = [];
-        let lobProjectiles = []; // 壁を越える放物線ロブ弾（スパイク改用）
+        let lobProjectiles = [];
         let items = [];
         let crates = [];
         let particles = [];
@@ -1252,7 +1708,6 @@
             angle: 0, pullRatio: 0, isSuper: false, dragged: false
         };
 
-        // カメラワーク管理（横画面でも広い視界を確保する自動ズーム＋マップ端クランプ）
         const camera = { x: MAP_W / 2, y: MAP_H / 2, zoom: 1.0, shake: 0 };
 
         function computeOptimalCameraZoom() {
@@ -1412,13 +1867,14 @@
 
         function createFighter(opts) {
             const spec = BRAWLERS[opts.brawler];
-            const aiMult = (!opts.isPlayer && isRankedMatch) ? getRankState(profile.rp).aiScale : 1.0;
-            const scaledHp = Math.round(spec.maxHp * (opts.isPlayer ? 1 : (0.96 + (aiMult - 1) * 0.35)));
+            const aiMult = (!opts.isPlayer && isRankedMatch) ? getRankState(profile.rp).aiScale : 1.05;
+            const scaledHp = Math.round(spec.maxHp * (opts.isPlayer ? 1 : (0.98 + (aiMult - 1) * 0.35)));
             return {
                 id: opts.id,
                 name: opts.name,
                 title: opts.title || PLAYER_TITLES[Math.floor(Math.random() * PLAYER_TITLES.length)],
                 isPlayer: !!opts.isPlayer,
+                isRemoteGuest: !!opts.isRemoteGuest,
                 isDecoy: !!opts.isDecoy,
                 decoyLife: opts.decoyLife || 0,
                 team: opts.team,
@@ -1427,6 +1883,8 @@
                 aiMult,
                 x: opts.x,
                 y: opts.y,
+                targetNetX: opts.x,
+                targetNetY: opts.y,
                 vx: 0,
                 vy: 0,
                 radius: 24,
@@ -1471,7 +1929,7 @@
                 jumpTimer: 0,
                 jumpDuration: 0.55,
                 jumpStartX: 0, jumpStartY: 0, jumpEndX: 0, jumpEndY: 0,
-                aiDecisionTimer: Math.random() * 0.2,
+                aiDecisionTimer: Math.random() * 0.15,
                 aiMoveX: 0, aiMoveY: 0,
                 aiStrafeDir: Math.random() < 0.5 ? 1 : -1
             };
@@ -1497,6 +1955,29 @@
             const regularBrawlers = ['shelly', 'colt', 'rico', 'primo', 'spike', 'crow', 'leon', 'najia'];
             const aiNames = ['ナジア', 'スパイク', 'クロウ', 'メカニック', 'ちちんぷいぷい！', '荒らし屋'];
             const spawns = getTeamSpawnPositions();
+
+            if (net.active && net.role === 'host' && net.connected) {
+                const fmt = document.getElementById('onlineFormatSelect').value;
+                entities.push(createFighter({
+                    id: 'player', name: 'ホスト(あなた)', title: 'オンラインホスト', isPlayer: true, team: 'blue',
+                    brawler: selectedBrawler, x: spawns.blue[0].x, y: spawns.blue[0].y, facing: -Math.PI / 2
+                }));
+                entities.push(createFighter({
+                    id: 'guest_player', name: '友達(ゲスト)', title: 'オンライン挑戦者', isPlayer: false, isRemoteGuest: true, team: 'red',
+                    brawler: net.guestBrawler, x: spawns.red[0].x, y: spawns.red[0].y, facing: Math.PI / 2
+                }));
+                if (fmt === '2v2') {
+                    entities.push(createFighter({
+                        id: 'ally_1', name: 'ナジア(AI)', title: 'スマートAI', isPlayer: false, team: 'blue',
+                        brawler: 'najia', x: spawns.blue[1].x, y: spawns.blue[1].y, facing: -Math.PI / 2
+                    }));
+                    entities.push(createFighter({
+                        id: 'enemy_1', name: 'リコ(AI)', title: 'スマートAI', isPlayer: false, team: 'red',
+                        brawler: 'rico', x: spawns.red[1].x, y: spawns.red[1].y, facing: Math.PI / 2
+                    }));
+                }
+                return;
+            }
 
             entities.push(createFighter({
                 id: 'player', name: 'あなた', title: '無限の彼方へ、さあ行くぞ！', isPlayer: true, team: 'blue',
@@ -1589,13 +2070,25 @@
             sound.init();
             sound.playClick();
 
+            if (net.active && net.role === 'guest') {
+                setOnlineStatus('⏳ ホストが「PLAY」を押すと自動的にバトルが始まります！', 'text-cyan-300');
+                return;
+            }
+
             if (resultAnimFrameId) {
                 cancelAnimationFrame(resultAnimFrameId);
                 resultAnimFrameId = null;
             }
 
             isRankedMatch = (queueType === 'ranked');
-            if (isRankedMatch) {
+            if (net.active && net.role === 'host' && net.connected) {
+                isRankedMatch = false;
+                activeMode = document.getElementById('onlineModeSelect').value;
+                const fmt = document.getElementById('onlineFormatSelect').value;
+                try {
+                    net.conn.send({ type: 'START_MATCH', mode: activeMode, format: fmt });
+                } catch (e) {}
+            } else if (isRankedMatch) {
                 const compModes = ['gemgrab', 'knockout', 'brawlball', 'hotzone'];
                 activeMode = compModes[Math.floor(Math.random() * compModes.length)];
             } else {
@@ -1670,6 +2163,7 @@
             document.getElementById('deadOverlayPanel').classList.add('hidden');
 
             document.getElementById('rankedMatchTag').classList.toggle('hidden', !isRankedMatch);
+            document.getElementById('onlineMatchTag').classList.toggle('hidden', !(net.active && net.connected));
             document.getElementById('hudGemGrab').classList.toggle('hidden', activeMode !== 'gemgrab');
             document.getElementById('hudBrawlBall').classList.toggle('hidden', activeMode !== 'brawlball');
             document.getElementById('hudHotZone').classList.toggle('hidden', activeMode !== 'hotzone');
@@ -1700,9 +2194,9 @@
                 updateGemCarrierHUD();
             }
 
-            const introBanner = isRankedMatch
-                ? `👑 ガチバトル - ${getModeJapaneseName(activeMode)}`
-                : getModeJapaneseName(activeMode);
+            const introBanner = (net.active && net.connected)
+                ? `🌐 ONLINE P2P - ${getModeJapaneseName(activeMode)}`
+                : (isRankedMatch ? `👑 ガチバトル - ${getModeJapaneseName(activeMode)}` : getModeJapaneseName(activeMode));
             triggerStartCountdown(introBanner);
         }
 
@@ -1736,8 +2230,10 @@
                 listEl.innerHTML = '';
                 return;
             }
+            const myTeam = (net.active && net.role === 'guest') ? 'red' : 'blue';
             listEl.innerHTML = carriers.map(c => {
-                const bg = c.team === 'blue' ? 'bg-blue-950/90 border-sky-400 text-sky-200' : 'bg-red-950/90 border-rose-400 text-rose-200';
+                const isAlly = c.team === myTeam;
+                const bg = isAlly ? 'bg-blue-950/90 border-sky-400 text-sky-200' : 'bg-red-950/90 border-rose-400 text-rose-200';
                 return `<span class="${bg} border px-2 py-0.5 rounded-full shadow">${c.name}: 💎${c.gems}</span>`;
             }).join('');
         }
@@ -1783,14 +2279,21 @@
 
         function getDamageMultiplier(fighter) {
             const hyperMult = fighter.hyperTimer > 0 ? 1.2 : 1.0;
-            return (1 + fighter.cubes * 0.1) * hyperMult * (fighter.isPlayer ? 1 : (0.94 + (fighter.aiMult - 1) * 0.35));
+            return (1 + fighter.cubes * 0.1) * hyperMult * ((fighter.isPlayer || fighter.isRemoteGuest) ? 1 : (0.95 + (fighter.aiMult - 1) * 0.35));
         }
 
         // ========================================================================
-        // 5. ハイパーチャージ発動処理
+        // 6. ハイパーチャージ＆ガジェット発動処理
         // ========================================================================
         function activateHypercharge(fighter) {
             if (!fighter || !fighter.alive || fighter.isDecoy || gameState !== 'PLAYING') return false;
+            if (net.active && net.role === 'guest') {
+                if (fighter.hyperCharge >= 1.0 && fighter.hyperTimer <= 0 && net.conn && net.connected) {
+                    try { net.conn.send({ type: 'GUEST_ACTION', action: 'hyper' }); } catch (e) {}
+                    sound.playHypercharge();
+                }
+                return true;
+            }
             if (fighter.hyperCharge < 1.0 || fighter.hyperTimer > 0) return false;
 
             fighter.hyperCharge = 0;
@@ -1809,11 +2312,15 @@
             return true;
         }
 
-        // ========================================================================
-        // 6. ガジェット発動処理（回数制限なし・クールダウン時間制限のみ）
-        // ========================================================================
         function activateGadget(fighter) {
             if (!fighter || !fighter.alive || fighter.jumping || fighter.isDecoy || gameState !== 'PLAYING') return false;
+            if (net.active && net.role === 'guest') {
+                if (fighter.gadgetCooldown <= 0 && net.conn && net.connected) {
+                    try { net.conn.send({ type: 'GUEST_ACTION', action: 'gadget' }); } catch (e) {}
+                    sound.playGadget();
+                }
+                return true;
+            }
             if (fighter.gadgetCooldown > 0) return false;
 
             fighter.gadgetCooldown = fighter.spec.gadgetCd;
@@ -1880,7 +2387,6 @@
                     healTimer: 0
                 });
             } else if (fighter.brawler === 'spike_kai') {
-                // スパイク改のガジェット：超広範囲の味方回復サークル展開（即時1400回復＋継続大回復）
                 const wideRadius = 290;
                 healingCacti.push({
                     owner: fighter,
@@ -1925,7 +2431,6 @@
                 decoy.maxHp = fighter.maxHp;
                 entities.push(decoy);
             } else if (fighter.brawler === 'najia') {
-                // ナジアのガジェット「サーペントステップ」：前方へ高速ステップ＋元いた地点に毒トラップ設置
                 const trapX = fighter.x;
                 const trapY = fighter.y;
                 const dashDist = 165;
@@ -1956,10 +2461,24 @@
         }
 
         // ========================================================================
-        // 7. 攻撃・必殺技（ナジア・スパイク改・レオン7秒透明含む）
+        // 7. 攻撃・必殺技実行処理
         // ========================================================================
         function executeAttack(fighter, angle, isSuper, targetDist = null) {
             if (!fighter || !fighter.alive || fighter.jumping || fighter.isDecoy || fighter.stunTimer > 0 || gameState !== 'PLAYING') return false;
+
+            if (net.active && net.role === 'guest' && fighter.isPlayer) {
+                if (net.conn && net.connected) {
+                    try {
+                        net.conn.send({
+                            type: 'GUEST_ACTION',
+                            action: isSuper ? 'super' : 'attack',
+                            angle,
+                            dist: targetDist
+                        });
+                    } catch (e) {}
+                }
+                return true;
+            }
 
             if (activeMode === 'brawlball' && soccerBall && soccerBall.carrier === fighter) {
                 soccerBall.carrier = null;
@@ -2080,7 +2599,6 @@
                     spawnParticles(landX, landY, isKai ? '#facc15' : '#22c55e', 18);
                     sound.playSlam();
                 } else if (isKai) {
-                    // スパイク改：壁を越える放物線ロブボールを投擲し、着地時に無数のトゲ弾がランダムに飛び散る
                     const landX = Math.max(48, Math.min(MAP_W - 48, fighter.x + Math.cos(angle) * d));
                     const landY = Math.max(48, Math.min(MAP_H - 48, fighter.y + Math.sin(angle) * d));
                     const flightDuration = Math.max(0.28, Math.min(0.62, d / 780));
@@ -2144,7 +2662,6 @@
                 }
             } else if (fighter.brawler === 'leon') {
                 if (isSuper) {
-                    // レオンのウルト透明時間を7.0秒に設定
                     fighter.stealthTimer = 7.0;
                     spawnShockwave(fighter.x, fighter.y, 100, '#14b8a6');
                     spawnParticles(fighter.x, fighter.y, '#14b8a6', 18);
@@ -2169,7 +2686,6 @@
             } else if (fighter.brawler === 'najia') {
                 if (fighter.isPlayer || distToPlayer(fighter) < 850) sound.playSnakeHiss();
                 if (isSuper) {
-                    // ナジア必殺技「コブラスワーム」：3体の巨大毒蛇が蛇行貫通し、終点に毒霧エリアを残す
                     const count = isHyper ? 4 : 3;
                     const dmg = Math.round(740 * dmgMult);
                     for (let i = 0; i < count; i++) {
@@ -2187,7 +2703,6 @@
                     }
                     spawnFloatingText(fighter.x, fighter.y - 42, '🐍 コブラスワーム！', '#bef264', 1.2);
                 } else {
-                    // ナジア通常攻撃：うねりながら飛ぶ双子の毒蛇弾（命中時スリップ毒）
                     const dmg = Math.round(spec.damagePerPellet * dmgMult);
                     for (let i = 0; i < 2; i++) {
                         const dirSign = i === 0 ? 1 : -1;
@@ -2430,7 +2945,6 @@
             }
 
             let finalAmount = amount;
-            // スパイク改の常時70%ダメージ軽減パッシブシールド
             if (target.spec && target.spec.passiveDamageReduction) {
                 finalAmount = Math.round(finalAmount * (1 - target.spec.passiveDamageReduction));
             }
@@ -2632,11 +3146,21 @@
         }
 
         // ========================================================================
-        // 9. ブロスタ本家風 斜め分割リザルト画面レンダリング＆起動
+        // 9. 斜め分割リザルト画面レンダリング＆起動
         // ========================================================================
         function endMatch(isVictory, subText) {
             if (gameState === 'GAME_OVER') return;
             gameState = 'GAME_OVER';
+
+            if (net.active && net.role === 'host' && net.conn && net.connected) {
+                try {
+                    net.conn.send({
+                        type: 'MATCH_OVER',
+                        winnerTeam: isVictory ? 'blue' : 'red',
+                        subText: isVictory ? 'オンライン対戦：相手チームの勝利...' : 'オンライン対戦：見事勝利！'
+                    });
+                } catch (e) {}
+            }
 
             const oldRankIdx = getRankState(profile.rp).idx;
             let rpDelta = 0;
@@ -2667,7 +3191,7 @@
             else sound.playDefeat();
 
             document.getElementById('battleHud').classList.add('hidden');
-            document.getElementById('topRightGlobalControls').classList.add('hidden');
+            document.getElementById('topRightGlobalControls').classList.remove('hidden');
             document.getElementById('btnQuit').classList.add('hidden');
             document.getElementById('announceBanner').classList.add('hidden');
             document.getElementById('centerSplash').classList.add('hidden');
@@ -2724,8 +3248,9 @@
 
         function build3v3ResultCards(isVictory) {
             const realFighters = entities.filter(e => !e.isDecoy);
-            const blueTeam = realFighters.filter(e => e.team === 'blue');
-            const redTeam = realFighters.filter(e => e.team === 'red');
+            const myTeam = (net.active && net.role === 'guest') ? 'red' : 'blue';
+            const blueTeam = realFighters.filter(e => e.team === myTeam);
+            const redTeam = realFighters.filter(e => e.team !== myTeam);
 
             let mvpFighter = realFighters[0];
             let maxScore = -1;
@@ -2733,7 +3258,7 @@
             let maxDmg = -1;
 
             for (const f of realFighters) {
-                const winBonus = ((isVictory && f.team === 'blue') || (!isVictory && f.team === 'red')) ? 2500 : 0;
+                const winBonus = ((isVictory && f.team === myTeam) || (!isVictory && f.team !== myTeam)) ? 2500 : 0;
                 const score = f.kills * 1800 + f.damageDealt - f.deaths * 400 + winBonus;
                 if (score > maxScore) { maxScore = score; mvpFighter = f; }
                 if (f.damageDealt > maxDmg) { maxDmg = f.damageDealt; topDamageFighter = f; }
@@ -2800,8 +3325,9 @@
 
         function startResultCanvasLoop(isVictory) {
             const realFighters = entities.filter(e => !e.isDecoy);
-            const blueTeam = realFighters.filter(e => e.team === 'blue');
-            const redTeam = realFighters.filter(e => e.team === 'red');
+            const myTeam = (net.active && net.role === 'guest') ? 'red' : 'blue';
+            const blueTeam = realFighters.filter(e => e.team === myTeam);
+            const redTeam = realFighters.filter(e => e.team !== myTeam);
             const rFxCanvas = document.getElementById('resultFxCanvas');
             const rFxCtx = rFxCanvas ? rFxCanvas.getContext('2d') : null;
 
@@ -2877,13 +3403,49 @@
         }
 
         // ========================================================================
-        // 10. 賢い戦術ボットAI（ナジア・ホットゾーン・ハイパーチャージ対応）
+        // 10. 高度な戦術スマートボットAI（弾道回避・視線判定・ブッシュ回復・優先度判断）
         // ========================================================================
         function isTileBlocked(wx, wy) {
             const c = Math.floor(wx / TILE_SIZE);
             const r = Math.floor(wy / TILE_SIZE);
             if (r < 0 || r >= MAP_ROWS || c < 0 || c >= MAP_COLS) return true;
             return mapGrid[r][c] === 1 || mapGrid[r][c] === 2;
+        }
+
+        function hasLineOfSight(x1, y1, x2, y2) {
+            const dist = Math.hypot(x2 - x1, y2 - y1);
+            const steps = Math.max(1, Math.floor(dist / 28));
+            for (let s = 1; s < steps; s++) {
+                const t = s / steps;
+                if (isTileBlocked(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t)) return false;
+            }
+            return true;
+        }
+
+        function findNearestBushOrCover(ai) {
+            const baseR = Math.floor(ai.y / TILE_SIZE);
+            const baseC = Math.floor(ai.x / TILE_SIZE);
+            let bestSpot = null;
+            let bestScore = Infinity;
+            const homeY = ai.team === 'blue' ? MAP_H - 220 : 220;
+
+            for (let dr = -6; dr <= 6; dr++) {
+                for (let dc = -6; dc <= 6; dc++) {
+                    const r = baseR + dr;
+                    const c = baseC + dc;
+                    if (r <= 1 || r >= MAP_ROWS - 2 || c <= 1 || c >= MAP_COLS - 2) continue;
+                    if (mapGrid[r][c] === 3) {
+                        const wx = c * TILE_SIZE + 32;
+                        const wy = r * TILE_SIZE + 32;
+                        const d = Math.hypot(wx - ai.x, wy - ai.y) + Math.abs(wy - homeY) * 0.25;
+                        if (d < bestScore) {
+                            bestScore = d;
+                            bestSpot = { x: wx, y: wy };
+                        }
+                    }
+                }
+            }
+            return bestSpot;
         }
 
         function updateAI(ai, dt) {
@@ -2898,28 +3460,81 @@
                 }
             }
 
-            ai.aiDecisionTimer -= dt;
-            let nearestEnemy = null, nearestEnemyDist = Infinity;
+            // 1. 優先度付きターゲット評価（瀕死の敵・エメラルド多数所持者・ボール保持者を優先狙撃）
+            let bestTarget = null;
+            let bestTargetScore = -Infinity;
+            let nearestEnemy = null;
+            let nearestEnemyDist = Infinity;
+
             for (const other of entities) {
                 if (other === ai || !other.alive || other.team === ai.team || other.jumping) continue;
                 if (other.stealthTimer > 0) continue;
                 const d = Math.hypot(other.x - ai.x, other.y - ai.y);
-                if (!other.visibleToEnemy && d > 175) continue;
-                if (d < nearestEnemyDist) { nearestEnemyDist = d; nearestEnemy = other; }
+                if (!other.visibleToEnemy && d > 180) continue;
+
+                if (d < nearestEnemyDist) {
+                    nearestEnemyDist = d;
+                    nearestEnemy = other;
+                }
+
+                let priorityScore = 1000 - d;
+                const enemyHpRatio = other.hp / other.maxHp;
+                if (enemyHpRatio < 0.35) priorityScore += 420; // トドメ優先
+                if (activeMode === 'gemgrab' && other.gems > 0) priorityScore += other.gems * 95;
+                if (activeMode === 'brawlball' && soccerBall && soccerBall.carrier === other) priorityScore += 650;
+                if (hasLineOfSight(ai.x, ai.y, other.x, other.y)) priorityScore += 220;
+
+                if (priorityScore > bestTargetScore) {
+                    bestTargetScore = priorityScore;
+                    bestTarget = other;
+                }
+            }
+
+            // 2. 飛来する敵弾のリアルタイム回避ベクトル計算
+            let dodgeX = 0;
+            let dodgeY = 0;
+            for (const b of bullets) {
+                if (b.team === ai.team) continue;
+                const relX = ai.x - b.x;
+                const relY = ai.y - b.y;
+                const dist = Math.hypot(relX, relY);
+                if (dist > 230 || dist < 1) continue;
+
+                const bSpd = Math.hypot(b.vx, b.vy) || 1;
+                const bDirX = b.vx / bSpd;
+                const bDirY = b.vy / bSpd;
+                const forwardProj = relX * bDirX + relY * bDirY;
+                if (forwardProj > -10 && forwardProj < 220) {
+                    const perpDist = relX * (-bDirY) + relY * bDirX;
+                    if (Math.abs(perpDist) < ai.radius + b.radius + 36) {
+                        const dodgeSign = perpDist >= 0 ? 1 : -1;
+                        const urgency = (1 - dist / 230) * 1.45;
+                        dodgeX += (-bDirY) * dodgeSign * urgency;
+                        dodgeY += (bDirX) * dodgeSign * urgency;
+                    }
+                }
             }
 
             const hpRatio = ai.hp / ai.maxHp;
-            const isLowHp = !ai.isDecoy && hpRatio < 0.36;
+            const isLowHp = !ai.isDecoy && hpRatio < 0.38;
 
+            ai.aiDecisionTimer -= dt;
             if (ai.aiDecisionTimer <= 0) {
-                ai.aiDecisionTimer = Math.max(0.14, 0.26 / ai.aiMult) + Math.random() * 0.1;
-                if (Math.random() < 0.25) ai.aiStrafeDir *= -1;
+                ai.aiDecisionTimer = Math.max(0.11, 0.21 / ai.aiMult) + Math.random() * 0.07;
+                if (Math.random() < 0.28) ai.aiStrafeDir *= -1;
 
                 let goalX = MAP_W / 2, goalY = MAP_H / 2;
 
                 if (isLowHp && !(activeMode === 'brawlball' && soccerBall && soccerBall.carrier === ai)) {
-                    goalX = MAP_W * 0.5 + (Math.random() - 0.5) * 300;
-                    goalY = ai.team === 'blue' ? MAP_H - 220 : 220;
+                    // HP低下時は近くのブッシュまたは自陣安全地帯へ退避して自然回復
+                    const bushSpot = findNearestBushOrCover(ai);
+                    if (bushSpot && (!nearestEnemy || nearestEnemyDist > 190)) {
+                        goalX = bushSpot.x;
+                        goalY = bushSpot.y;
+                    } else {
+                        goalX = MAP_W * 0.5 + (Math.random() - 0.5) * 260;
+                        goalY = ai.team === 'blue' ? MAP_H - 210 : 210;
+                    }
                 } else if (activeMode === 'brawlball' && soccerBall) {
                     if (!soccerBall.carrier) {
                         goalX = soccerBall.x; goalY = soccerBall.y;
@@ -2929,48 +3544,54 @@
                         const bestGoal = getBestGoalAimPoint(ai);
                         goalX = bestGoal.x; goalY = bestGoal.y;
                     } else {
-                        goalX = soccerBall.carrier.x + (ai.id.endsWith('1') ? -180 : 180);
-                        goalY = ai.team === 'blue' ? Math.max(160, soccerBall.carrier.y - 160) : Math.min(MAP_H - 160, soccerBall.carrier.y + 160);
+                        goalX = soccerBall.carrier.x + (ai.id.endsWith('1') ? -170 : 170);
+                        goalY = ai.team === 'blue' ? Math.max(150, soccerBall.carrier.y - 165) : Math.min(MAP_H - 150, soccerBall.carrier.y + 165);
                     }
                 } else if (activeMode === 'hotzone' && hotZone) {
-                    const spreadAng = ai.id.endsWith('1') ? -0.9 : (ai.id.endsWith('2') ? 0.9 : 0);
-                    goalX = hotZone.x + Math.sin(spreadAng) * 95;
-                    goalY = hotZone.y + (ai.team === 'blue' ? 50 : -50);
+                    const spreadAng = ai.id.endsWith('1') ? -0.85 : (ai.id.endsWith('2') ? 0.85 : 0);
+                    goalX = hotZone.x + Math.sin(spreadAng) * 90;
+                    goalY = hotZone.y + (ai.team === 'blue' ? 42 : -42);
                 } else if (activeMode === 'gemgrab' && ai.gems >= 8) {
-                    goalX = MAP_W * 0.5 + (Math.random() - 0.5) * 240;
-                    goalY = ai.team === 'blue' ? MAP_H - 240 : 240;
-                } else if (activeMode === 'gemgrab' && items.length > 0 && (!nearestEnemy || nearestEnemyDist > 260)) {
+                    const bushSpot = findNearestBushOrCover(ai);
+                    if (bushSpot && Math.abs(bushSpot.y - (ai.team === 'blue' ? MAP_H : 0)) < 560) {
+                        goalX = bushSpot.x; goalY = bushSpot.y;
+                    } else {
+                        goalX = MAP_W * 0.5 + (Math.random() - 0.5) * 220;
+                        goalY = ai.team === 'blue' ? MAP_H - 230 : 230;
+                    }
+                } else if (activeMode === 'gemgrab' && items.length > 0 && (!nearestEnemy || nearestEnemyDist > 230)) {
                     let bestGem = items[0], minG = Infinity;
                     for (const it of items) {
                         const gd = Math.hypot(it.x - ai.x, it.y - ai.y);
                         if (gd < minG) { minG = gd; bestGem = it; }
                     }
                     goalX = bestGem.x; goalY = bestGem.y;
-                } else if (nearestEnemy) {
-                    const idealDist = (ai.brawler === 'primo') ? 95 : (ai.brawler === 'shelly' ? 190 : ai.spec.range * 0.72);
-                    const toEnemyAng = Math.atan2(nearestEnemy.y - ai.y, nearestEnemy.x - ai.x);
+                } else if (bestTarget) {
+                    const targetDist = Math.hypot(bestTarget.x - ai.x, bestTarget.y - ai.y);
+                    const idealDist = (ai.brawler === 'primo') ? 85 : (ai.brawler === 'shelly' ? 175 : ai.spec.range * 0.74);
+                    const toEnemyAng = Math.atan2(bestTarget.y - ai.y, bestTarget.x - ai.x);
 
-                    if (nearestEnemyDist < idealDist * 0.75) {
-                        const retreatAng = toEnemyAng + Math.PI + ai.aiStrafeDir * 0.45;
-                        goalX = ai.x + Math.cos(retreatAng) * 160;
-                        goalY = ai.y + Math.sin(retreatAng) * 160;
-                    } else if (nearestEnemyDist > idealDist * 1.15) {
-                        goalX = nearestEnemy.x;
-                        goalY = nearestEnemy.y;
+                    if (targetDist < idealDist * 0.76) {
+                        const retreatAng = toEnemyAng + Math.PI + ai.aiStrafeDir * 0.42;
+                        goalX = ai.x + Math.cos(retreatAng) * 165;
+                        goalY = ai.y + Math.sin(retreatAng) * 165;
+                    } else if (targetDist > idealDist * 1.12 || !hasLineOfSight(ai.x, ai.y, bestTarget.x, bestTarget.y)) {
+                        goalX = bestTarget.x + Math.cos(toEnemyAng + Math.PI / 2) * 55 * ai.aiStrafeDir;
+                        goalY = bestTarget.y + Math.sin(toEnemyAng + Math.PI / 2) * 55 * ai.aiStrafeDir;
                     } else {
                         const strafeAng = toEnemyAng + (Math.PI / 2) * ai.aiStrafeDir;
-                        goalX = ai.x + Math.cos(strafeAng) * 150;
-                        goalY = ai.y + Math.sin(strafeAng) * 150;
+                        goalX = ai.x + Math.cos(strafeAng) * 155;
+                        goalY = ai.y + Math.sin(strafeAng) * 155;
                     }
                 } else {
-                    goalX = MAP_W / 2 + (Math.random() - 0.5) * 320;
-                    goalY = MAP_H / 2 + (Math.random() - 0.5) * 320;
+                    goalX = MAP_W / 2 + (Math.random() - 0.5) * 300;
+                    goalY = MAP_H / 2 + (Math.random() - 0.5) * 300;
                 }
 
                 let desiredAng = Math.atan2(goalY - ai.y, goalX - ai.x);
-                const lookAhead = 56;
+                const lookAhead = 58;
                 if (isTileBlocked(ai.x + Math.cos(desiredAng) * lookAhead, ai.y + Math.sin(desiredAng) * lookAhead)) {
-                    const testOffsets = [0.6, -0.6, 1.2, -1.2, 1.8, -1.8, Math.PI];
+                    const testOffsets = [0.55, -0.55, 1.1, -1.1, 1.7, -1.7, Math.PI];
                     for (const off of testOffsets) {
                         const candAng = desiredAng + off;
                         if (!isTileBlocked(ai.x + Math.cos(candAng) * lookAhead, ai.y + Math.sin(candAng) * lookAhead)) {
@@ -2984,46 +3605,70 @@
                 ai.aiMoveY = Math.sin(desiredAng);
             }
 
+            let moveX = ai.aiMoveX + dodgeX;
+            let moveY = ai.aiMoveY + dodgeY;
+            const mLen = Math.hypot(moveX, moveY);
+            if (mLen > 0.01) {
+                moveX /= mLen;
+                moveY /= mLen;
+            }
+
             const hyperSpd = ai.hyperTimer > 0 ? 1.2 : 1.0;
             const slowFactor = ai.slowTimer > 0 ? 0.55 : (ai.speedBoostTimer > 0 ? 1.35 : 1.0);
-            ai.vx = ai.aiMoveX * ai.spec.speed * 0.92 * slowFactor * hyperSpd;
-            ai.vy = ai.aiMoveY * ai.spec.speed * 0.92 * slowFactor * hyperSpd;
+            ai.vx = moveX * ai.spec.speed * 0.95 * slowFactor * hyperSpd;
+            ai.vy = moveY * ai.spec.speed * 0.95 * slowFactor * hyperSpd;
 
             if (ai.isDecoy) return;
 
-            if (ai.hyperCharge >= 1.0 && nearestEnemy && nearestEnemyDist < 420) {
+            // ハイパーチャージの戦略的発動
+            if (ai.hyperCharge >= 1.0 && bestTarget && Math.hypot(bestTarget.x - ai.x, bestTarget.y - ai.y) < 420) {
                 activateHypercharge(ai);
             }
 
+            // ガジェットの戦術的発動
             if (ai.gadgetCooldown <= 0 && nearestEnemy) {
-                if ((ai.brawler === 'crow' && hpRatio < 0.55 && nearestEnemyDist < 360) ||
-                    (ai.brawler === 'primo' && nearestEnemyDist < 150) ||
-                    (ai.brawler === 'rico' && nearestEnemyDist < 340) ||
-                    ((ai.brawler === 'spike' || ai.brawler === 'spike_kai') && hpRatio < 0.65) ||
-                    (ai.brawler === 'colt' && ai.ammo < 1 && nearestEnemyDist < 420) ||
-                    (ai.brawler === 'leon' && nearestEnemyDist < 320) ||
-                    (ai.brawler === 'najia' && nearestEnemyDist < 220)) {
+                if ((ai.brawler === 'crow' && hpRatio < 0.58 && nearestEnemyDist < 380) ||
+                    (ai.brawler === 'primo' && nearestEnemyDist < 155) ||
+                    (ai.brawler === 'rico' && nearestEnemyDist < 360) ||
+                    ((ai.brawler === 'spike' || ai.brawler === 'spike_kai') && hpRatio < 0.68) ||
+                    (ai.brawler === 'colt' && ai.ammo < 1 && nearestEnemyDist < 430) ||
+                    (ai.brawler === 'leon' && nearestEnemyDist < 340) ||
+                    (ai.brawler === 'najia' && nearestEnemyDist < 235) ||
+                    (ai.brawler === 'shelly' && hpRatio < 0.42 && nearestEnemyDist < 240)) {
                     activateGadget(ai);
                 }
             }
 
+            // ブロストライカーでのゴールシュート判定
             if (activeMode === 'brawlball' && soccerBall && soccerBall.carrier === ai) {
                 const targetGoal = getBestGoalAimPoint(ai);
                 const distToGoal = Math.hypot(targetGoal.x - ai.x, targetGoal.y - ai.y);
-                if (distToGoal < 780) {
+                if (distToGoal < 820) {
                     executeAttack(ai, Math.atan2(targetGoal.y - ai.y, targetGoal.x - ai.x), ai.superCharge >= 1.0);
                     return;
                 }
             }
 
-            if (nearestEnemy && nearestEnemy.spawnShieldTimer <= 0 && nearestEnemyDist <= ai.spec.range * 1.08) {
-                const leadTime = nearestEnemyDist / (ai.spec.bulletSpeed || 500);
-                const predX = nearestEnemy.x + nearestEnemy.vx * leadTime * 0.45;
-                const predY = nearestEnemy.y + nearestEnemy.vy * leadTime * 0.45;
-                const aimAngle = Math.atan2(predY - ai.y, predX - ai.x);
+            // 高精度偏差射撃（壁越し不可のキャラは視線が通る時のみ無駄撃ちせず発射）
+            const fireTarget = bestTarget || nearestEnemy;
+            if (fireTarget && fireTarget.spawnShieldTimer <= 0) {
+                const fDist = Math.hypot(fireTarget.x - ai.x, fireTarget.y - ai.y);
+                const isLobber = (ai.brawler === 'spike_kai');
+                const canHit = isLobber || hasLineOfSight(ai.x, ai.y, fireTarget.x, fireTarget.y);
 
-                if (ai.superCharge >= 1.0) executeAttack(ai, aimAngle, true, nearestEnemyDist);
-                else if (ai.ammo >= 1 && Math.random() < 0.13 * ai.aiMult) executeAttack(ai, aimAngle, false, nearestEnemyDist);
+                if (canHit && fDist <= ai.spec.range * 1.08) {
+                    const bSpd = ai.spec.bulletSpeed || 500;
+                    const leadTime = fDist / bSpd;
+                    const predX = fireTarget.x + fireTarget.vx * leadTime * 0.68;
+                    const predY = fireTarget.y + fireTarget.vy * leadTime * 0.68;
+                    const aimAngle = Math.atan2(predY - ai.y, predX - ai.x);
+
+                    if (ai.superCharge >= 1.0) {
+                        executeAttack(ai, aimAngle, true, fDist);
+                    } else if (ai.ammo >= 1 && Math.random() < 0.18 * ai.aiMult) {
+                        executeAttack(ai, aimAngle, false, fDist);
+                    }
+                }
             }
         }
 
@@ -3033,6 +3678,68 @@
         function update(dt) {
             globalAnimTime += dt;
             if (gameState === 'LOBBY' || gameState === 'GAME_OVER') return;
+
+            // P2Pゲストクライアント側の描画補間＆入力送信ループ
+            if (net.active && net.role === 'guest') {
+                const me = getPlayer();
+                if (me && me.alive && gameState === 'PLAYING') {
+                    let ix = 0, iy = 0;
+                    if (keys['KeyW'] || keys['ArrowUp']) iy -= 1;
+                    if (keys['KeyS'] || keys['ArrowDown']) iy += 1;
+                    if (keys['KeyA'] || keys['ArrowLeft']) ix -= 1;
+                    if (keys['KeyD'] || keys['ArrowRight']) ix += 1;
+                    if (moveStick.active) { ix = moveStick.dx; iy = moveStick.dy; }
+                    const len = Math.hypot(ix, iy);
+                    if (len > 1) { ix /= len; iy /= len; }
+                    if (len > 0.05 && !attackStick.active && !mouseAim.active) {
+                        me.facing = Math.atan2(iy, ix);
+                    }
+
+                    net.inputSendTimer += dt;
+                    if (net.inputSendTimer >= 0.04 && net.conn && net.connected) {
+                        net.inputSendTimer = 0;
+                        try {
+                            net.conn.send({
+                                type: 'GUEST_INPUT',
+                                ix: Number(ix.toFixed(2)),
+                                iy: Number(iy.toFixed(2)),
+                                facing: Number(me.facing.toFixed(2))
+                            });
+                        } catch (e) {}
+                    }
+                }
+
+                for (const f of entities) {
+                    if (typeof f.targetNetX === 'number') {
+                        const prevX = f.x, prevY = f.y;
+                        f.x += (f.targetNetX - f.x) * Math.min(1, dt * 18);
+                        f.y += (f.targetNetY - f.y) * Math.min(1, dt * 18);
+                        f.vx = (f.x - prevX) / Math.max(0.001, dt);
+                        f.vy = (f.y - prevY) / Math.max(0.001, dt);
+                        if (Math.hypot(f.vx, f.vy) > 15) f.walkPhase += dt * 11;
+                    }
+                }
+
+                if (me) {
+                    const targetCam = clampCameraPosition(me.x, me.y);
+                    camera.x += (targetCam.x - camera.x) * (1 - Math.exp(-10 * dt));
+                    camera.y += (targetCam.y - camera.y) * (1 - Math.exp(-10 * dt));
+
+                    const ring = document.getElementById('superRing');
+                    const knob = document.getElementById('superStickKnob');
+                    const zone = document.getElementById('superStickZone');
+                    const circum = 276.46;
+                    ring.style.strokeDashoffset = circum * (1 - me.superCharge);
+                    if (me.superCharge >= 1.0) {
+                        knob.className = 'w-10 h-10 rounded-full bg-gradient-to-b from-yellow-300 to-amber-500 border-2 border-black flex items-center justify-center text-lg pointer-events-none';
+                        zone.classList.add('super-ready');
+                    } else {
+                        knob.className = 'w-10 h-10 rounded-full bg-slate-700 border-2 border-black flex items-center justify-center text-lg pointer-events-none opacity-75';
+                        zone.classList.remove('super-ready');
+                    }
+                }
+                return;
+            }
 
             if (gameState === 'COUNTDOWN') {
                 startFreezeTimer -= dt;
@@ -3058,6 +3765,10 @@
                     splash.classList.add('hidden');
                     gameState = 'PLAYING';
                 }
+                if (net.active && net.role === 'host') {
+                    net.syncTimer += dt;
+                    if (net.syncTimer >= 0.05) { net.syncTimer = 0; broadcastHostSnapshot(); }
+                }
                 return;
             }
 
@@ -3071,6 +3782,10 @@
                         resetPositionsForGoalOrRound();
                         triggerStartCountdown('KICK OFF!');
                     }
+                }
+                if (net.active && net.role === 'host') {
+                    net.syncTimer += dt;
+                    if (net.syncTimer >= 0.05) { net.syncTimer = 0; broadcastHostSnapshot(); }
                 }
                 return;
             }
@@ -3173,7 +3888,7 @@
             if (activeMode === 'gemgrab') {
                 gemSpawnTimer -= dt;
                 if (gemSpawnTimer <= 0) {
-                    gemSpawnTimer = 11.5; // 排出頻度を抑えて戦略性を向上
+                    gemSpawnTimer = 11.5;
                     const ang = Math.random() * Math.PI * 2;
                     items.push({ type: 'gem', x: MAP_W / 2 + Math.cos(ang) * 28, y: MAP_H / 2 + Math.sin(ang) * 28, bob: 0 });
                 }
@@ -3211,7 +3926,6 @@
                         else redIn++;
                     }
                 }
-                // ホットゾーンの占領速度を緩やかに調整（熱い攻防が楽しめるペース）
                 if (blueIn > 0 && redIn === 0) {
                     hotZone.owner = 'blue';
                     hzBlueProgress = Math.min(100, hzBlueProgress + (1.45 + blueIn * 0.45) * dt);
@@ -3443,6 +4157,20 @@
                         f.vy = iy * norm * f.spec.speed * slowFactor * hyperSpd;
                         if (!attackStick.active && !mouseAim.active) f.facing = Math.atan2(f.vy, f.vx);
                     } else { f.vx = 0; f.vy = 0; }
+                } else if (f.isRemoteGuest) {
+                    const ix = net.guestInput.ix;
+                    const iy = net.guestInput.iy;
+                    const len = Math.hypot(ix, iy);
+                    const hyperSpd = f.hyperTimer > 0 ? 1.2 : 1.0;
+                    const slowFactor = f.slowTimer > 0 ? 0.55 : (f.speedBoostTimer > 0 ? 1.38 : 1.0);
+                    if (len > 0.02) {
+                        const norm = len > 1 ? 1 / len : 1;
+                        f.vx = ix * norm * f.spec.speed * slowFactor * hyperSpd;
+                        f.vy = iy * norm * f.spec.speed * slowFactor * hyperSpd;
+                    } else {
+                        f.vx = 0; f.vy = 0;
+                    }
+                    f.facing = net.guestInput.facing;
                 } else {
                     updateAI(f, dt);
                 }
@@ -3451,225 +4179,223 @@
                 f.y += f.vy * dt;
                 resolveCircleMapCollision(f);
 
-                const moveSpd = Math.hypot(f.vx, f.vy);
-                if (moveSpd > 15) {
+                const moveSpeed = Math.hypot(f.vx, f.vy);
+                if (moveSpeed > 15) {
                     f.walkPhase += dt * 11;
                     f.dustTimer += dt;
-                    if (f.dustTimer >= 0.25) {
+                    if (f.dustTimer >= 0.16) {
                         f.dustTimer = 0;
-                        spawnParticles(f.x, f.y + f.radius * 0.55, f.hyperTimer > 0 ? '#e879f9' : (f.inBush ? '#4ade80' : '#d6b37c'), 2);
+                        spawnParticles(f.x, f.y + f.radius * 0.6, f.hyperTimer > 0 ? '#e879f9' : '#d6c7b2', 1);
                     }
+                } else {
+                    f.walkPhase = 0;
+                    f.dustTimer = 0;
                 }
 
                 if (f.jumpPadCooldown <= 0) {
                     for (const jp of jumpPads) {
-                        if (Math.hypot(f.x - jp.x, f.y - jp.y) < jp.radius + f.radius * 0.5) {
-                            f.jumping = true;
-                            f.jumpIsUltimate = false;
-                            f.jumpDuration = 0.65;
-                            f.jumpTimer = 0;
-                            f.jumpStartX = f.x;
-                            f.jumpStartY = f.y;
-                            f.jumpEndX = jp.targetX;
-                            f.jumpEndY = jp.targetY;
+                        if (Math.hypot(f.x - jp.x, f.y - jp.y) < jp.radius) {
+                            f.jumping = true; f.jumpIsUltimate = false; f.jumpDuration = 0.6; f.jumpTimer = 0;
+                            f.jumpStartX = f.x; f.jumpStartY = f.y; f.jumpEndX = jp.targetX; f.jumpEndY = jp.targetY;
                             f.jumpPadCooldown = 2.0;
-                            f.facing = Math.atan2(jp.targetY - f.y, jp.targetX - f.x);
-                            spawnShockwave(jp.x, jp.y, 75, '#facc15');
-                            spawnParticles(jp.x, jp.y, '#facc15', 14);
-                            if (f.isPlayer || distToPlayer(f) < 750) sound.playJump();
+                            if (f.isPlayer || distToPlayer(f) < 600) sound.playJump();
                             break;
                         }
                     }
                 }
 
-                const tc = Math.floor(f.x / TILE_SIZE), tr = Math.floor(f.y / TILE_SIZE);
-                const tileVal = (tr >= 0 && tr < MAP_ROWS && tc >= 0 && tc < MAP_COLS) ? mapGrid[tr][tc] : 0;
-                f.inBush = (tileVal === 3);
-                if (tileVal === 4) f.speedBoostTimer = 0.4;
+                const c = Math.max(0, Math.min(MAP_COLS - 1, Math.floor(f.x / TILE_SIZE)));
+                const r = Math.max(0, Math.min(MAP_ROWS - 1, Math.floor(f.y / TILE_SIZE)));
+                f.inBush = (mapGrid[r][c] === 3);
 
-                if (!f.inBush) f.visibleToEnemy = true;
-                else if (f.outOfCombatTimer > 1.2) f.visibleToEnemy = false;
+                let revealedByNearEnemy = false;
+                for (const other of entities) {
+                    if (other === f || !other.alive || other.team === f.team) continue;
+                    if (Math.hypot(other.x - f.x, other.y - f.y) < 130) { revealedByNearEnemy = true; break; }
+                }
+                f.visibleToEnemy = (f.stealthTimer <= 0) && (!f.inBush || revealedByNearEnemy);
 
                 if (f.ammo < f.maxAmmo) {
-                    f.reloadTimer += dt;
+                    const hyperReload = f.hyperTimer > 0 ? 1.25 : 1.0;
+                    f.reloadTimer += dt * hyperReload;
                     if (f.reloadTimer >= f.spec.reloadTime) { f.reloadTimer = 0; f.ammo = Math.min(f.maxAmmo, f.ammo + 1); }
-                }
+                } else f.reloadTimer = 0;
 
                 f.outOfCombatTimer += dt;
-                if (f.outOfCombatTimer >= 3.0 && f.hp < f.maxHp) {
+                if (f.outOfCombatTimer >= 3.0 && f.hp < f.maxHp && !f.isDecoy && !f.poisonState) {
                     f.healTickTimer += dt;
-                    if (f.healTickTimer >= 0.5) {
+                    if (f.healTickTimer >= 0.8) {
                         f.healTickTimer = 0;
-                        f.hp = Math.min(f.maxHp, f.hp + Math.round(f.maxHp * 0.13));
+                        const healAmt = Math.round(f.maxHp * 0.13);
+                        f.hp = Math.min(f.maxHp, f.hp + healAmt);
+                        spawnFloatingText(f.x, f.y - 30, `+${healAmt}`, '#4ade80', 0.95);
+                        if (f.isPlayer) sound.playHeal();
                     }
                 }
             }
 
-            // スパイク改専用：壁を越える放物線ロブボール更新＆着地時ランダム無数弾分裂
+            entities = entities.filter(e => !e.isDecoy || e.alive);
+
+            // カメラ追従（マップ端の黒帯をクランプして常にアリーナを広く視認）
+            const p = getPlayer();
+            if (p) {
+                let focusX = p.x, focusY = p.y;
+                if (!p.alive && activeMode === 'knockout') {
+                    const aliveAlly = entities.find(e => !e.isDecoy && e.team === 'blue' && e.alive);
+                    if (aliveAlly) { focusX = aliveAlly.x; focusY = aliveAlly.y; }
+                }
+                const targetCam = clampCameraPosition(focusX, focusY);
+                const followFactor = 1 - Math.exp(-8.5 * dt);
+                camera.x += (targetCam.x - camera.x) * followFactor;
+                camera.y += (targetCam.y - camera.y) * followFactor;
+                if (camera.shake > 0) camera.shake = Math.max(0, camera.shake - dt * 35);
+
+                const ring = document.getElementById('superRing');
+                const knob = document.getElementById('superStickKnob');
+                const zone = document.getElementById('superStickZone');
+                const circum = 276.46;
+                ring.style.strokeDashoffset = circum * (1 - p.superCharge);
+
+                if (p.superCharge >= 1.0) {
+                    knob.className = 'w-10 h-10 rounded-full bg-gradient-to-b from-yellow-300 to-amber-500 border-2 border-black flex items-center justify-center text-lg pointer-events-none';
+                    zone.classList.add('super-ready');
+                } else {
+                    knob.className = 'w-10 h-10 rounded-full bg-slate-700 border-2 border-black flex items-center justify-center text-lg pointer-events-none opacity-75';
+                    zone.classList.remove('super-ready');
+                }
+            }
+
+            // 放物線投擲弾（スパイク改の壁越えサボテンボール）更新
             for (let i = lobProjectiles.length - 1; i >= 0; i--) {
                 const lp = lobProjectiles[i];
                 lp.elapsed += dt;
-                lp.spin += dt * 14;
-                const t = Math.min(1, lp.elapsed / lp.duration);
-                lp.x = lp.startX + (lp.endX - lp.startX) * t;
-                lp.y = lp.startY + (lp.endY - lp.startY) * t;
+                lp.spin += dt * 15;
+                const progress = Math.min(1, lp.elapsed / lp.duration);
+                lp.x = lp.startX + (lp.endX - lp.startX) * progress;
+                lp.y = lp.startY + (lp.endY - lp.startY) * progress;
 
-                if (t >= 1) {
+                if (progress >= 1) {
                     lobProjectiles.splice(i, 1);
-                    spawnShockwave(lp.endX, lp.endY, 95, '#facc15');
-                    spawnParticles(lp.endX, lp.endY, '#4ade80', 16);
-                    if ((lp.owner && lp.owner.isPlayer) || distToPlayer({ x: lp.endX, y: lp.endY }) < 850) {
-                        sound.playSlam();
-                    }
+                    sound.playSlam();
+                    spawnShockwave(lp.endX, lp.endY, 130, '#facc15');
+                    spawnParticles(lp.endX, lp.endY, '#22c55e', 16);
 
-                    // 着地点の直撃判定
-                    const directHitIds = new Set();
-                    for (const target of entities) {
-                        if (!target.alive || target.team === lp.team || target.jumping) continue;
-                        if (Math.hypot(target.x - lp.endX, target.y - lp.endY) <= target.radius + 36) {
-                            directHitIds.add(target.id);
-                            if (lp.owner && !target.isDecoy && target.spawnShieldTimer <= 0) {
+                    for (const f of entities) {
+                        if (!f.alive || f.team === lp.team || f.jumping) continue;
+                        if (Math.hypot(f.x - lp.endX, f.y - lp.endY) <= f.radius + 54) {
+                            applyDamage(lp.owner, f, lp.directDamage);
+                            if (lp.owner && lp.owner.alive && !lp.owner.isDecoy) {
                                 lp.owner.superCharge = Math.min(1.0, lp.owner.superCharge + lp.owner.spec.superChargePerHit);
                             }
-                            applyDamage(lp.owner, target, lp.directDamage, 140, Math.atan2(target.y - lp.endY, target.x - lp.endX));
                         }
                     }
 
-                    // 着地した瞬間に無数の弾がランダムな角度・速度で飛び散る
-                    for (let k = 0; k < lp.shrapnelCount; k++) {
-                        const randAng = Math.random() * Math.PI * 2;
-                        const randSpd = 310 + Math.random() * 260;
-                        const randDist = 140 + Math.random() * 145;
+                    const count = lp.shrapnelCount || 20;
+                    const baseAngle = Math.random() * Math.PI * 2;
+                    for (let s = 0; s < count; s++) {
+                        const a = baseAngle + (s / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.14;
+                        const spd = 430 + Math.random() * 140;
+                        const rng = 210 + Math.random() * 90;
                         bullets.push({
                             owner: lp.owner,
                             team: lp.team,
                             x: lp.endX,
                             y: lp.endY,
-                            vx: Math.cos(randAng) * randSpd,
-                            vy: Math.sin(randAng) * randSpd,
-                            distLeft: randDist,
+                            vx: Math.cos(a) * spd,
+                            vy: Math.sin(a) * spd,
+                            distLeft: rng,
                             damage: lp.shrapnelDamage,
-                            radius: 5.5,
-                            color: k % 2 === 0 ? '#facc15' : '#4ade80',
+                            radius: 6,
+                            color: s % 2 === 0 ? '#facc15' : '#4ade80',
                             isSuper: false,
                             breaksWalls: false,
                             pierce: false,
                             knockback: 0,
                             isPoison: false,
                             bouncesLeft: 0,
-                            hitIds: new Set(directHitIds),
+                            hitIds: new Set(),
                             trail: []
                         });
                     }
                 }
             }
 
-            // 弾丸更新（ナジアの蛇行軌道・リコの壁反射含む）
+            // 弾丸更新＆リコ反射＆ナジア蛇波動
             for (let i = bullets.length - 1; i >= 0; i--) {
                 const b = bullets[i];
-                const prevX = b.x, prevY = b.y;
-                if (b.trail) {
-                    b.trail.push({ x: prevX, y: prevY });
-                    if (b.trail.length > 6) b.trail.shift();
-                }
-                if (b.spin !== undefined) b.spin += dt * 16;
+                if (!b.trail) b.trail = [];
+                b.trail.push({ x: b.x, y: b.y });
+                if (b.trail.length > 6) b.trail.shift();
 
-                let stepX = b.vx * dt;
-                let stepY = b.vy * dt;
-
-                // ナジアの毒蛇弾は進行方向に対してうねる蛇行軌道を描いて飛ぶ
                 if (b.isNajiaSnake) {
-                    b.snakeTimer = (b.snakeTimer || 0) + dt * 14;
+                    b.snakeTimer = (b.snakeTimer || 0) + dt;
                     const baseAng = Math.atan2(b.vy, b.vx);
-                    const perpAng = baseAng + Math.PI / 2;
-                    const waveAmp = b.isNajiaSuper ? 185 : 130;
-                    const waveVel = Math.cos(b.snakeTimer + (b.snakePhase || 0)) * waveAmp;
-                    stepX += Math.cos(perpAng) * waveVel * dt;
-                    stepY += Math.sin(perpAng) * waveVel * dt;
-                }
-
-                b.x += stepX;
-                b.y += stepY;
-                b.distLeft -= Math.hypot(b.vx * dt, b.vy * dt);
-
-                let removeBullet = b.distLeft <= 0;
-                const tc = Math.floor(b.x / TILE_SIZE), tr = Math.floor(b.y / TILE_SIZE);
-
-                if (tr < 0 || tr >= MAP_ROWS || tc < 0 || tc >= MAP_COLS) {
-                    removeBullet = true;
+                    const spd = Math.hypot(b.vx, b.vy);
+                    const waveOffset = Math.cos(b.snakeTimer * 15 + (b.snakePhase || 0)) * (b.isNajiaSuper ? 140 : 115);
+                    b.x += (Math.cos(baseAng) * spd - Math.sin(baseAng) * waveOffset) * dt;
+                    b.y += (Math.sin(baseAng) * spd + Math.cos(baseAng) * waveOffset) * dt;
+                    b.distLeft -= spd * dt;
                 } else {
-                    const hitTile = mapGrid[tr][tc];
-                    if (hitTile === 1 || hitTile === 2) {
-                        if (hitTile === 2 && b.breaksWalls) {
-                            mapGrid[tr][tc] = 0;
-                            spawnParticles(tc * TILE_SIZE + 32, tr * TILE_SIZE + 32, '#d97706', 8);
-                            removeBullet = true;
-                        } else if (b.bouncesLeft > 0) {
-                            b.bouncesLeft -= 1;
-                            const prevC = Math.floor(prevX / TILE_SIZE);
-                            const prevR = Math.floor(prevY / TILE_SIZE);
-                            if (prevC !== tc && prevR === tr) b.vx = -b.vx;
-                            else if (prevR !== tr && prevC === tc) b.vy = -b.vy;
-                            else { b.vx = -b.vx; b.vy = -b.vy; }
-                            b.x = prevX + b.vx * dt;
-                            b.y = prevY + b.vy * dt;
-                            b.distLeft += 95;
-                            b.damage = Math.round(b.damage * 1.15);
-                            b.color = '#facc15';
-                            b.hitIds.clear();
-                            spawnParticles(b.x, b.y, '#38bdf8', 4);
-                            if (b.owner && b.owner.isPlayer) sound.playBounce();
-                        } else {
-                            removeBullet = true;
-                        }
-                    }
+                    const stepX = b.vx * dt;
+                    const stepY = b.vy * dt;
+                    b.x += stepX;
+                    b.y += stepY;
+                    b.distLeft -= Math.hypot(stepX, stepY);
                 }
 
-                if (removeBullet && b.isSpikeGrenade) {
-                    spawnSpikeSplit(b);
-                }
-                if (removeBullet && b.isNajiaSuper) {
-                    slowZones.push({
-                        owner: b.owner,
-                        team: b.team,
-                        x: Math.max(80, Math.min(MAP_W - 80, b.x)),
-                        y: Math.max(80, Math.min(MAP_H - 80, b.y)),
-                        radius: 90,
-                        life: 3.8,
-                        tickTimer: 0,
-                        damage: Math.round(280 * (b.owner ? getDamageMultiplier(b.owner) : 1)),
-                        isVenom: true
-                    });
-                    spawnShockwave(b.x, b.y, 90, '#84cc16');
+                if (b.isSpikeGrenade || b.isLeonBlade) b.spin += dt * 14;
+
+                let removeBullet = false;
+
+                if (b.distLeft <= 0) {
+                    if (b.isSpikeGrenade) triggerSpikeSplit(b);
+                    removeBullet = true;
                 }
 
                 if (!removeBullet) {
-                    for (const target of entities) {
-                        if (!target.alive || target.team === b.team || target.jumping || b.hitIds.has(target.id)) continue;
-                        if (Math.hypot(target.x - b.x, target.y - b.y) < target.radius + b.radius) {
-                            b.hitIds.add(target.id);
-                            if (!b.isSuper && b.owner && !target.isDecoy && target.spawnShieldTimer <= 0) {
-                                b.owner.superCharge = Math.min(1.0, b.owner.superCharge + b.owner.spec.superChargePerHit);
+                    const c = Math.floor(b.x / TILE_SIZE);
+                    const r = Math.floor(b.y / TILE_SIZE);
+                    if (r < 0 || r >= MAP_ROWS || c < 0 || c >= MAP_COLS) {
+                        removeBullet = true;
+                    } else {
+                        const tile = mapGrid[r][c];
+                        if (tile === 1 || tile === 2) {
+                            if (b.breaksWalls && tile === 2) {
+                                mapGrid[r][c] = 0;
+                                spawnParticles(c * TILE_SIZE + 32, r * TILE_SIZE + 32, '#d97706', 10);
+                            } else if (b.bouncesLeft > 0) {
+                                b.bouncesLeft -= 1;
+                                b.distLeft += 120;
+                                const tileCenterX = c * TILE_SIZE + TILE_SIZE / 2;
+                                const tileCenterY = r * TILE_SIZE + TILE_SIZE / 2;
+                                const dx = b.x - tileCenterX;
+                                const dy = b.y - tileCenterY;
+                                if (Math.abs(dx) > Math.abs(dy)) {
+                                    b.vx = -b.vx;
+                                    b.x += Math.sign(dx) * 8;
+                                } else {
+                                    b.vy = -b.vy;
+                                    b.y += Math.sign(dy) * 8;
+                                }
+                                spawnShockwave(b.x, b.y, 44, '#38bdf8');
+                                spawnParticles(b.x, b.y, '#38bdf8', 5);
+                                if (b.owner && (b.owner.isPlayer || distToPlayer(b.owner) < 750)) sound.playBounce();
+                            } else {
+                                if (b.isSpikeGrenade) triggerSpikeSplit(b);
+                                spawnParticles(b.x, b.y, b.color, 4);
+                                removeBullet = true;
                             }
-                            let finalDmg = b.damage;
-                            if (b.isLeonBlade) {
-                                const traveled = Math.hypot(b.x - b.startX, b.y - b.startY);
-                                finalDmg = Math.round(b.damage * Math.max(0.55, 1.15 - traveled / 500));
-                            }
-                            applyDamage(b.owner, target, finalDmg, b.knockback, Math.atan2(b.vy, b.vx), false, b.isPoison, false);
-
-                            if (b.isSpikeGrenade) spawnSpikeSplit(b);
-                            if (!b.pierce) { removeBullet = true; break; }
                         }
                     }
                 }
 
                 if (!removeBullet) {
-                    for (const hc of healingCacti) {
+                    for (let ci = healingCacti.length - 1; ci >= 0; ci--) {
+                        const hc = healingCacti[ci];
                         if (hc.team === b.team) continue;
-                        if (Math.hypot(hc.x - b.x, hc.y - b.y) < 24 + b.radius) {
+                        if (Math.hypot(b.x - hc.x, b.y - hc.y) < b.radius + 22) {
                             hc.hp -= b.damage;
-                            spawnParticles(hc.x, hc.y, '#22c55e', 4);
+                            spawnParticles(b.x, b.y, '#22c55e', 4);
                             if (!b.pierce) { removeBullet = true; break; }
                         }
                     }
@@ -3677,15 +4403,51 @@
 
                 if (!removeBullet && activeMode === 'showdown') {
                     for (let ci = crates.length - 1; ci >= 0; ci--) {
-                        const c = crates[ci];
-                        if (Math.hypot(c.x - b.x, c.y - b.y) < c.radius + b.radius) {
-                            c.hp -= b.damage;
-                            c.hitFlash = 0.1;
-                            if (c.hp <= 0) {
-                                items.push({ type: 'cube', x: c.x, y: c.y, bob: 0 });
-                                spawnParticles(c.x, c.y, '#22c55e', 14);
+                        const cr = crates[ci];
+                        if (Math.hypot(b.x - cr.x, b.y - cr.y) < b.radius + cr.radius) {
+                            cr.hp -= b.damage; cr.hitFlash = 0.1;
+                            spawnParticles(cr.x, cr.y, '#d97706', 4);
+                            if (cr.hp <= 0) {
+                                items.push({ type: 'cube', x: cr.x, y: cr.y, bob: 0 });
                                 crates.splice(ci, 1);
                             }
+                            if (b.isSpikeGrenade) triggerSpikeSplit(b);
+                            if (!b.pierce) { removeBullet = true; break; }
+                        }
+                    }
+                }
+
+                if (!removeBullet) {
+                    for (const f of entities) {
+                        if (!f.alive || f.team === b.team || f.jumping || b.hitIds.has(f.id)) continue;
+                        if (Math.hypot(b.x - f.x, b.y - f.y) < b.radius + f.radius) {
+                            b.hitIds.add(f.id);
+                            let finalDmg = b.damage;
+                            if (b.isLeonBlade && b.startX !== undefined) {
+                                const traveled = Math.hypot(b.x - b.startX, b.y - b.startY);
+                                finalDmg = Math.round(b.damage * Math.max(0.55, 1.0 - (traveled / 440) * 0.45));
+                            }
+                            applyDamage(b.owner, f, finalDmg, b.knockback, Math.atan2(b.vy, b.vx), false, b.isPoison, false);
+
+                            if (b.isNajiaSuper) {
+                                slowZones.push({
+                                    owner: b.owner,
+                                    team: b.team,
+                                    x: f.x,
+                                    y: f.y,
+                                    radius: 95,
+                                    life: 3.2,
+                                    tickTimer: 0.75,
+                                    damage: Math.round(280 * getDamageMultiplier(b.owner)),
+                                    isVenom: true
+                                });
+                                spawnShockwave(f.x, f.y, 95, '#84cc16');
+                            }
+
+                            if (!b.isSuper && b.owner && b.owner.alive && !b.owner.isDecoy && !f.isDecoy) {
+                                b.owner.superCharge = Math.min(1.0, b.owner.superCharge + b.owner.spec.superChargePerHit);
+                            }
+                            if (b.isSpikeGrenade) triggerSpikeSplit(b);
                             if (!b.pierce) { removeBullet = true; break; }
                         }
                     }
@@ -3694,244 +4456,249 @@
                 if (removeBullet) bullets.splice(i, 1);
             }
 
-            // アイテム回収
+            // アイテム回収（エメラルド・パワーキューブ）
+            let gemPicked = false;
             for (let i = items.length - 1; i >= 0; i--) {
                 const it = items[i];
-                it.bob += dt * 5;
+                it.bob += dt * 4;
                 for (const f of entities) {
                     if (!f.alive || f.jumping || f.isDecoy) continue;
-                    if (Math.hypot(f.x - it.x, f.y - it.y) < f.radius + 22) {
+                    if (Math.hypot(f.x - it.x, f.y - it.y) < f.radius + 20) {
                         if (it.type === 'gem') {
                             f.gems += 1;
-                            sound.playGem();
-                            spawnFloatingText(f.x, f.y - 36, `💎 ${f.gems}個！`, '#e879f9', 1.0);
-                            updateGemCarrierHUD();
+                            gemPicked = true;
+                            spawnFloatingText(f.x, f.y - 30, '+1 💎', '#e879f9', 1.1);
+                            if (f.isPlayer) sound.playGem();
                         } else if (it.type === 'cube') {
-                            f.cubes += 1;
-                            f.maxHp += 600;
-                            f.hp = Math.min(f.maxHp, f.hp + 600);
-                            sound.playCube();
+                            f.cubes += 1; f.maxHp += 380; f.hp += 380;
+                            spawnFloatingText(f.x, f.y - 30, 'POWER UP!', '#4ade80', 1.1);
+                            if (f.isPlayer) sound.playCube();
                         }
                         items.splice(i, 1);
                         break;
                     }
                 }
             }
-
-            for (let i = particles.length - 1; i >= 0; i--) { particles[i].x += particles[i].vx * dt; particles[i].y += particles[i].vy * dt; particles[i].life -= dt; if (particles[i].life <= 0) particles.splice(i, 1); }
-            for (let i = floatingTexts.length - 1; i >= 0; i--) { floatingTexts[i].y -= 42 * dt; floatingTexts[i].life -= dt; if (floatingTexts[i].life <= 0) floatingTexts.splice(i, 1); }
-            for (let i = lockOnEffects.length - 1; i >= 0; i--) { lockOnEffects[i].life -= dt; if (lockOnEffects[i].life <= 0) lockOnEffects.splice(i, 1); }
-
-            entities = entities.filter(e => !e.isDecoy || e.alive);
-
-            // カメラ追従（スムーズ補間＋マップ端クランプでバグや見切れを完全防止）
-            const player = getPlayer();
-            let focusTarget = player;
-            if (player && !player.alive && activeMode === 'knockout') {
-                const livingAlly = entities.find(e => !e.isDecoy && e.team === 'blue' && e.alive);
-                if (livingAlly) focusTarget = livingAlly;
-            }
-            if (focusTarget) {
-                let leadX = 0, leadY = 0;
-                if (focusTarget.isPlayer && (attackStick.dragged || mouseAim.dragged)) {
-                    const ang = attackStick.dragged ? attackStick.angle : mouseAim.angle;
-                    leadX = Math.cos(ang) * 40;
-                    leadY = Math.sin(ang) * 40;
-                }
-                const targetCam = clampCameraPosition(focusTarget.x + leadX, focusTarget.y + leadY);
-                const lerpAlpha = 1 - Math.exp(-9 * dt);
-                camera.x += (targetCam.x - camera.x) * lerpAlpha;
-                camera.y += (targetCam.y - camera.y) * lerpAlpha;
+            if (gemPicked && activeMode === 'gemgrab') {
+                updateGemCarrierHUD();
             }
 
-            if (player) {
-                const ring = document.getElementById('superRing');
-                const knob = document.getElementById('superStickKnob');
-                const zone = document.getElementById('superStickZone');
-                const circum = 276.46;
-                ring.style.strokeDashoffset = circum * (1 - player.superCharge);
-                if (player.superCharge >= 1.0) {
-                    knob.className = 'w-10 h-10 rounded-full bg-gradient-to-b from-yellow-300 to-amber-500 border-2 border-black flex items-center justify-center text-lg pointer-events-none';
-                    zone.classList.add('super-ready');
-                } else {
-                    knob.className = 'w-10 h-10 rounded-full bg-slate-700 border-2 border-black flex items-center justify-center text-lg pointer-events-none opacity-75';
-                    zone.classList.remove('super-ready');
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const pt = particles[i];
+                pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.life -= dt;
+                if (pt.life <= 0) particles.splice(i, 1);
+            }
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.y -= 35 * dt; ft.life -= dt;
+                if (ft.life <= 0) floatingTexts.splice(i, 1);
+            }
+            for (let i = lockOnEffects.length - 1; i >= 0; i--) {
+                lockOnEffects[i].life -= dt;
+                if (lockOnEffects[i].life <= 0) lockOnEffects.splice(i, 1);
+            }
+
+            if (net.active && net.role === 'host') {
+                net.syncTimer += dt;
+                if (net.syncTimer >= 0.04) {
+                    net.syncTimer = 0;
+                    broadcastHostSnapshot();
                 }
             }
-            if (camera.shake > 0) camera.shake = Math.max(0, camera.shake - 45 * dt);
         }
 
-        function spawnSpikeSplit(b) {
-            for (let sp = 0; sp < 6; sp++) {
-                const sa = (sp / 6) * Math.PI * 2;
+        function triggerSpikeSplit(b) {
+            const splitDmg = Math.round(b.damage * 0.56);
+            for (let s = 0; s < 6; s++) {
+                const a = (s / 6) * Math.PI * 2;
                 bullets.push({
                     owner: b.owner, team: b.team, x: b.x, y: b.y,
-                    vx: Math.cos(sa) * 390, vy: Math.sin(sa) * 390,
-                    distLeft: 175, damage: Math.round(b.damage * 0.45), radius: 5,
-                    color: '#22c55e', isSuper: false, breaksWalls: false, pierce: false,
-                    knockback: 0, isPoison: false, bouncesLeft: 0, hitIds: new Set(b.hitIds), trail: []
+                    vx: Math.cos(a) * 440, vy: Math.sin(a) * 440, distLeft: 175,
+                    damage: splitDmg, radius: 5, color: '#4ade80', isSuper: false,
+                    breaksWalls: false, pierce: false, knockback: 0, isPoison: false, bouncesLeft: 0, hitIds: new Set(), trail: []
                 });
             }
+            spawnParticles(b.x, b.y, '#22c55e', 8);
         }
 
         // ========================================================================
-        // 12. レンダリング（カメラズーム・頭上エメラルド個数バッジ・スパイク改ロブ弾）
+        // 12. 描画ループ
         // ========================================================================
         function render() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
             if (gameState === 'LOBBY') return;
 
-            const player = getPlayer();
-            const z = camera.zoom || 1.0;
+            ctx.save();
             const shakeX = camera.shake > 0 ? (Math.random() - 0.5) * camera.shake : 0;
             const shakeY = camera.shake > 0 ? (Math.random() - 0.5) * camera.shake : 0;
-
-            ctx.save();
             ctx.translate(canvas.width / 2 + shakeX, canvas.height / 2 + shakeY);
-            ctx.scale(z, z);
+            ctx.scale(camera.zoom, camera.zoom);
             ctx.translate(-camera.x, -camera.y);
 
-            const halfW = (canvas.width / 2) / z;
-            const halfH = (canvas.height / 2) / z;
+            const halfW = (canvas.width / 2) / camera.zoom;
+            const halfH = (canvas.height / 2) / camera.zoom;
             const startCol = Math.max(0, Math.floor((camera.x - halfW) / TILE_SIZE) - 1);
             const endCol = Math.min(MAP_COLS - 1, Math.ceil((camera.x + halfW) / TILE_SIZE) + 1);
             const startRow = Math.max(0, Math.floor((camera.y - halfH) / TILE_SIZE) - 1);
             const endRow = Math.min(MAP_ROWS - 1, Math.ceil((camera.y + halfH) / TILE_SIZE) + 1);
 
+            const isSoccer = (activeMode === 'brawlball');
+
             for (let r = startRow; r <= endRow; r++) {
                 for (let c = startCol; c <= endCol; c++) {
                     const x = c * TILE_SIZE, y = r * TILE_SIZE;
-                    if (activeMode === 'brawlball') {
-                        ctx.fillStyle = (r + c) % 2 === 0 ? '#4ade80' : '#22c55e';
+                    const isEven = (r + c) % 2 === 0;
+                    if (isSoccer) {
+                        ctx.fillStyle = isEven ? '#22c55e' : '#16a34a';
                     } else {
-                        ctx.fillStyle = (r + c) % 2 === 0 ? '#eab676' : '#dfa35d';
+                        ctx.fillStyle = isEven ? '#e2b879' : '#d8ac6c';
                     }
                     ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
 
-                    ctx.fillStyle = 'rgba(0,0,0,0.04)';
-                    ctx.fillRect(x + 8, y + 8, TILE_SIZE - 16, TILE_SIZE - 16);
-
-                    if (mapGrid[r][c] === 3) {
-                        const sway = Math.sin(globalAnimTime * 3.2 + r * 0.7 + c * 0.5) * 2.5;
-                        ctx.fillStyle = '#15803d';
-                        ctx.beginPath();
-                        ctx.roundRect(x + 3, y + 3, TILE_SIZE - 6, TILE_SIZE - 6, 12);
-                        ctx.fill();
-                        ctx.fillStyle = '#22c55e';
-                        ctx.beginPath();
-                        ctx.arc(x + 22 + sway, y + 24, 12, 0, Math.PI * 2);
-                        ctx.arc(x + 42 - sway, y + 34, 13, 0, Math.PI * 2);
-                        ctx.fill();
-                    } else if (mapGrid[r][c] === 4) {
+                    if (mapGrid[r][c] === 4) {
                         ctx.fillStyle = '#0284c7';
-                        ctx.fillRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
-                        const flow = ((globalAnimTime * 28) % 16) - 8;
-                        ctx.strokeStyle = '#facc15';
-                        ctx.lineWidth = 4;
+                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+                        ctx.lineWidth = 2;
                         ctx.beginPath();
-                        ctx.moveTo(x + 18, y + 40 - flow); ctx.lineTo(x + 32, y + 22 - flow); ctx.lineTo(x + 46, y + 40 - flow);
+                        ctx.moveTo(x + 12, y + 32 + Math.sin(globalAnimTime * 3 + c) * 4);
+                        ctx.lineTo(x + 52, y + 32 - Math.sin(globalAnimTime * 3 + r) * 4);
                         ctx.stroke();
                     }
                 }
             }
 
-            if (activeMode === 'hotzone' && hotZone) {
-                ctx.save();
-                ctx.translate(hotZone.x, hotZone.y);
-                let fillCol = 'rgba(255, 255, 255, 0.14)';
-                let strokeCol = '#facc15';
-                if (hotZone.owner === 'blue') { fillCol = 'rgba(56, 189, 246, 0.25)'; strokeCol = '#38bdf8'; }
-                else if (hotZone.owner === 'red') { fillCol = 'rgba(239, 68, 68, 0.25)'; strokeCol = '#ef4444'; }
-                else if (hotZone.owner === 'contested') { fillCol = 'rgba(232, 121, 249, 0.25)'; strokeCol = '#e879f9'; }
+            if (isSoccer) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.moveTo(TILE_SIZE, MAP_H / 2);
+                ctx.lineTo(MAP_W - TILE_SIZE, MAP_H / 2);
+                ctx.stroke();
 
                 ctx.beginPath();
-                ctx.arc(0, 0, hotZone.radius, 0, Math.PI * 2);
-                ctx.fillStyle = fillCol;
+                ctx.arc(MAP_W / 2, MAP_H / 2, 130, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.35)';
+                ctx.fillRect(10 * TILE_SIZE, 0, 10 * TILE_SIZE, TILE_SIZE * 0.9);
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 6;
+                ctx.strokeRect(10 * TILE_SIZE, 0, 10 * TILE_SIZE, TILE_SIZE * 0.9);
+
+                ctx.fillStyle = 'rgba(59, 130, 246, 0.35)';
+                ctx.fillRect(10 * TILE_SIZE, MAP_H - TILE_SIZE * 0.9, 10 * TILE_SIZE, TILE_SIZE * 0.9);
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 6;
+                ctx.strokeRect(10 * TILE_SIZE, MAP_H - TILE_SIZE * 0.9, 10 * TILE_SIZE, TILE_SIZE * 0.9);
+            }
+
+            if (activeMode === 'hotzone' && hotZone) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(hotZone.x, hotZone.y, hotZone.radius, 0, Math.PI * 2);
+                if (hotZone.owner === 'blue') {
+                    ctx.fillStyle = 'rgba(56, 189, 246, 0.25)';
+                    ctx.strokeStyle = '#38bdf8';
+                } else if (hotZone.owner === 'red') {
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
+                    ctx.strokeStyle = '#ef4444';
+                } else if (hotZone.owner === 'contested') {
+                    ctx.fillStyle = 'rgba(250, 204, 21, 0.25)';
+                    ctx.strokeStyle = '#facc15';
+                } else {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.14)';
+                    ctx.strokeStyle = '#cbd5e1';
+                }
                 ctx.fill();
                 ctx.lineWidth = 6;
-                ctx.strokeStyle = strokeCol;
                 ctx.setLineDash([16, 10]);
-                ctx.lineDashOffset = -globalAnimTime * 40;
                 ctx.stroke();
-                ctx.setLineDash([]);
-
-                ctx.font = '900 28px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('🚩', 0, 0);
-                ctx.restore();
-            }
-
-            for (const jp of jumpPads) {
-                ctx.save();
-                ctx.translate(jp.x, jp.y);
-                const rScale = 1 + Math.sin(jp.pulse) * 0.08;
-                ctx.scale(rScale, rScale);
-                ctx.beginPath(); ctx.arc(0, 0, jp.radius, 0, Math.PI * 2);
-                ctx.fillStyle = '#facc15'; ctx.fill();
-                ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.stroke();
-                ctx.beginPath(); ctx.arc(0, 0, jp.radius * 0.55, 0, Math.PI * 2);
-                ctx.fillStyle = '#ef4444'; ctx.fill();
-                ctx.restore();
-            }
-
-            // スパイク回復サボテン描画（スパイク改の超広範囲回復サークルにも対応）
-            for (const hc of healingCacti) {
-                ctx.save();
-                ctx.translate(hc.x, hc.y);
-                ctx.beginPath(); ctx.arc(0, 0, hc.radius, 0, Math.PI * 2);
-                ctx.fillStyle = hc.isKaiPlant ? 'rgba(250, 204, 21, 0.16)' : 'rgba(74, 222, 128, 0.16)'; ctx.fill();
-                ctx.lineWidth = hc.isKaiPlant ? 3.5 : 2;
-                ctx.strokeStyle = hc.isKaiPlant ? '#facc15' : '#4ade80';
-                ctx.setLineDash([10, 6]); ctx.stroke();
-                ctx.setLineDash([]);
-
-                const bob = 1 + Math.sin(globalAnimTime * 6) * 0.06;
-                ctx.scale(bob, bob);
-                ctx.fillStyle = hc.isKaiPlant ? '#15803d' : '#16a34a'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
-                ctx.beginPath(); ctx.arc(0, 0, hc.isKaiPlant ? 25 : 20, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-                ctx.fillStyle = hc.isKaiPlant ? '#facc15' : '#f43f5e';
-                ctx.beginPath(); ctx.arc(0, -16, hc.isKaiPlant ? 9 : 7, 0, Math.PI * 2); ctx.fill();
                 ctx.restore();
             }
 
             for (const sz of slowZones) {
                 ctx.save();
                 ctx.beginPath(); ctx.arc(sz.x, sz.y, sz.radius, 0, Math.PI * 2);
-                ctx.fillStyle = sz.isVenom ? 'rgba(132, 204, 22, 0.28)' : 'rgba(34, 197, 94, 0.28)'; ctx.fill();
-                ctx.lineWidth = 3; ctx.strokeStyle = sz.isVenom ? '#84cc16' : '#16a34a'; ctx.setLineDash([8, 6]); ctx.stroke();
+                ctx.fillStyle = sz.isVenom ? 'rgba(132, 204, 22, 0.35)' : 'rgba(34, 197, 94, 0.3)';
+                ctx.fill();
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = sz.isVenom ? '#a3e635' : '#4ade80';
+                ctx.stroke();
                 ctx.restore();
             }
 
-            if (activeMode === 'brawlball') {
-                ctx.fillStyle = 'rgba(239, 68, 68, 0.45)';
-                ctx.fillRect(10 * TILE_SIZE, 0, 10 * TILE_SIZE, 44);
-                ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 5; ctx.strokeRect(10 * TILE_SIZE, 0, 10 * TILE_SIZE, 44);
+            for (const hc of healingCacti) {
+                ctx.save();
+                ctx.beginPath(); ctx.arc(hc.x, hc.y, hc.radius, 0, Math.PI * 2);
+                ctx.fillStyle = hc.isKaiPlant ? 'rgba(250, 204, 21, 0.22)' : 'rgba(74, 222, 128, 0.2)';
+                ctx.fill();
+                ctx.lineWidth = hc.isKaiPlant ? 4 : 3;
+                ctx.strokeStyle = hc.isKaiPlant ? '#facc15' : '#4ade80';
+                ctx.setLineDash([10, 6]); ctx.stroke(); ctx.setLineDash([]);
+                ctx.fillStyle = hc.isKaiPlant ? '#15803d' : '#16a34a';
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5;
+                ctx.beginPath(); ctx.arc(hc.x, hc.y, hc.isKaiPlant ? 24 : 18, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = hc.isKaiPlant ? '#facc15' : '#fef08a';
+                ctx.beginPath(); ctx.arc(hc.x, hc.y - 6, hc.isKaiPlant ? 9 : 6, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            }
 
-                ctx.fillStyle = 'rgba(59, 130, 246, 0.45)';
-                ctx.fillRect(10 * TILE_SIZE, MAP_H - 44, 10 * TILE_SIZE, 44);
-                ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 5; ctx.strokeRect(10 * TILE_SIZE, MAP_H - 44, 10 * TILE_SIZE, 44);
-
-                ctx.beginPath(); ctx.arc(MAP_W / 2, MAP_H / 2, 110, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 4; ctx.stroke();
+            for (const jp of jumpPads) {
+                const s = 1 + Math.sin(jp.pulse) * 0.08;
+                ctx.save(); ctx.translate(jp.x, jp.y); ctx.scale(s, s);
+                ctx.fillStyle = '#334155'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.arc(0, 0, jp.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#facc15';
+                ctx.beginPath(); ctx.moveTo(-10, 6); ctx.lineTo(0, -10); ctx.lineTo(10, 6); ctx.closePath(); ctx.fill();
+                ctx.restore();
             }
 
             if (activeMode === 'gemgrab') {
-                ctx.save();
-                ctx.translate(MAP_W / 2, MAP_H / 2);
-                ctx.rotate(globalAnimTime * 1.4);
-                ctx.beginPath(); ctx.arc(0, 0, 36, 0, Math.PI * 2);
-                ctx.fillStyle = '#311042'; ctx.fill();
-                ctx.lineWidth = 4; ctx.strokeStyle = '#c084fc'; ctx.setLineDash([10, 6]); ctx.stroke();
+                ctx.save(); ctx.translate(MAP_W / 2, MAP_H / 2);
+                ctx.fillStyle = '#1e1b4b'; ctx.strokeStyle = '#a855f7'; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.arc(0, 0, 32, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
                 ctx.restore();
             }
 
+            for (let r = startRow; r <= endRow; r++) {
+                for (let c = startCol; c <= endCol; c++) {
+                    const t = mapGrid[r][c];
+                    const x = c * TILE_SIZE, y = r * TILE_SIZE;
+                    if (t === 1) {
+                        ctx.fillStyle = '#475569'; ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        ctx.fillStyle = '#64748b'; ctx.fillRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 14);
+                        ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 3; ctx.strokeRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+                    } else if (t === 2) {
+                        ctx.fillStyle = '#92400e'; ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+                        ctx.fillStyle = '#d97706'; ctx.fillRect(x + 6, y + 6, TILE_SIZE - 12, TILE_SIZE - 18);
+                        ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5; ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+                    } else if (t === 3) {
+                        ctx.fillStyle = '#15803d'; ctx.beginPath(); ctx.arc(x + 32, y + 32, 30, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = '#22c55e'; ctx.beginPath(); ctx.arc(x + 26, y + 26, 20, 0, Math.PI * 2); ctx.fill();
+                    }
+                }
+            }
+
+            if (activeMode === 'showdown') {
+                for (const cr of crates) {
+                    ctx.save(); ctx.translate(cr.x, cr.y);
+                    ctx.fillStyle = cr.hitFlash > 0 ? '#fff' : '#b45309';
+                    ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+                    ctx.fillRect(-cr.radius, -cr.radius, cr.radius * 2, cr.radius * 2);
+                    ctx.strokeRect(-cr.radius, -cr.radius, cr.radius * 2, cr.radius * 2);
+                    ctx.restore();
+                }
+            }
+
             for (const it of items) {
-                ctx.save();
-                ctx.translate(it.x, it.y + Math.sin(it.bob) * 4);
+                const bobY = Math.sin(it.bob) * 4;
+                ctx.save(); ctx.translate(it.x, it.y + bobY);
                 if (it.type === 'gem') {
-                    ctx.fillStyle = '#e879f9'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5;
-                    ctx.beginPath(); ctx.moveTo(0, -13); ctx.lineTo(11, 0); ctx.lineTo(0, 13); ctx.lineTo(-11, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = '#d946ef'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5;
+                    ctx.beginPath(); ctx.moveTo(0, -14); ctx.lineTo(12, 0); ctx.lineTo(0, 14); ctx.lineTo(-12, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
                 } else {
                     ctx.fillStyle = '#22c55e'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5;
                     ctx.fillRect(-12, -12, 24, 24); ctx.strokeRect(-12, -12, 24, 24);
@@ -3939,647 +4706,362 @@
                 ctx.restore();
             }
 
-            for (const c of crates) {
+            if (activeMode === 'brawlball' && soccerBall) {
                 ctx.save();
-                ctx.translate(c.x, c.y);
-                ctx.fillStyle = '#b45309'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
-                ctx.fillRect(-24, -24, 48, 48); ctx.strokeRect(-24, -24, 48, 48);
-                ctx.fillStyle = '#22c55e'; ctx.fillRect(-20, -34, 40 * (c.hp / c.maxHp), 5);
+                ctx.translate(soccerBall.x, soccerBall.y);
+                if (soccerBall.superKick) {
+                    ctx.beginPath(); ctx.arc(0, 0, soccerBall.radius + 10, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(250, 204, 21, 0.45)'; ctx.fill();
+                }
+                ctx.rotate(soccerBall.spin);
+                ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.arc(0, 0, soccerBall.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#1e293b';
+                ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.fill();
+                for (let k = 0; k < 5; k++) {
+                    const a = (k / 5) * Math.PI * 2;
+                    ctx.beginPath(); ctx.arc(Math.cos(a) * 12, Math.sin(a) * 12, 4, 0, Math.PI * 2); ctx.fill();
+                }
                 ctx.restore();
             }
 
+            const p = getPlayer();
+            if (p && p.alive && !p.jumping && gameState === 'PLAYING') {
+                const aimObj = attackStick.active ? attackStick : (mouseAim.active ? mouseAim : null);
+                if (aimObj) renderAimGuide(p, aimObj.angle, aimObj.pullRatio, aimObj.isSuper);
+            }
+
             for (const sw of shockwaves) {
+                const alpha = Math.max(0, sw.life / sw.maxLife);
                 ctx.save();
-                ctx.beginPath(); ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
-                ctx.lineWidth = 4;
-                ctx.globalAlpha = Math.max(0, sw.life / sw.maxLife);
+                ctx.globalAlpha = alpha * 0.75;
                 ctx.strokeStyle = sw.color;
+                ctx.lineWidth = 4 * alpha;
+                ctx.beginPath();
+                ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
                 ctx.stroke();
                 ctx.restore();
             }
 
-            if (player && player.alive && !player.jumping && gameState === 'PLAYING') {
-                let aimData = null;
-                if (attackStick.active && attackStick.dragged) {
-                    aimData = { angle: attackStick.angle, pullRatio: attackStick.pullRatio, isSuper: attackStick.isSuper };
-                } else if (mouseAim.active && mouseAim.dragged) {
-                    aimData = { angle: mouseAim.angle, pullRatio: mouseAim.pullRatio, isSuper: mouseAim.isSuper };
-                }
-                if (aimData) {
-                    drawWorldAimReticle(player, aimData.angle, aimData.pullRatio, aimData.isSuper);
-                }
-            }
-
             for (const lk of lockOnEffects) {
+                const alpha = Math.max(0, lk.life / lk.maxLife);
                 ctx.save();
                 ctx.translate(lk.x, lk.y);
-                ctx.beginPath(); ctx.arc(0, 0, lk.radius, 0, Math.PI * 2);
-                ctx.lineWidth = 4; ctx.strokeStyle = `rgba(239, 68, 68, ${lk.life / lk.maxLife})`; ctx.stroke();
+                ctx.rotate((1 - alpha) * 1.5);
+                ctx.strokeStyle = `rgba(250, 204, 21, ${alpha})`;
+                ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.arc(0, 0, lk.radius * (0.85 + alpha * 0.25), 0, Math.PI * 2); ctx.stroke();
                 ctx.restore();
             }
 
-            if (activeMode === 'brawlball' && soccerBall) {
-                ctx.save();
-                ctx.translate(soccerBall.x, soccerBall.y);
-                const ballSpd = Math.hypot(soccerBall.vx, soccerBall.vy);
-                if (ballSpd > 650 || soccerBall.superKick) {
-                    ctx.beginPath();
-                    ctx.arc(0, 0, soccerBall.radius + 7, 0, Math.PI * 2);
-                    ctx.fillStyle = soccerBall.superKick ? 'rgba(250, 204, 21, 0.45)' : 'rgba(56, 189, 248, 0.35)';
-                    ctx.fill();
-                }
-                ctx.rotate(soccerBall.spin || 0);
-                ctx.beginPath(); ctx.arc(0, 0, soccerBall.radius, 0, Math.PI * 2);
-                ctx.fillStyle = soccerBall.superKick ? '#facc15' : '#ffffff'; ctx.fill();
-                ctx.lineWidth = 3.5; ctx.strokeStyle = '#000'; ctx.stroke();
-                ctx.fillStyle = '#1e293b';
-                ctx.beginPath(); ctx.arc(0, 0, 6.5, 0, Math.PI * 2); ctx.fill();
-                ctx.beginPath(); ctx.arc(10, 0, 4, 0, Math.PI * 2); ctx.arc(-10, 0, 4, 0, Math.PI * 2); ctx.fill();
-                ctx.restore();
-            }
-
-            const sortedEntities = [...entities].sort((a, b) => a.y - b.y);
+            const myTeam = (net.active && net.role === 'guest') ? 'red' : 'blue';
+            const sortedEntities = [...entities].filter(e => e.alive).sort((a, b) => a.y - b.y);
             for (const f of sortedEntities) {
-                if (!f.alive) continue;
-                const isAlly = player && f.team === player.team;
-                if (!isAlly && !f.visibleToEnemy && (!player || Math.hypot(f.x - player.x, f.y - player.y) > 165)) continue;
-                if (f.stealthTimer > 0 && !isAlly) continue;
+                const isAlly = (f.team === myTeam);
+                if (!isAlly && !f.visibleToEnemy) continue;
 
                 ctx.save();
-                ctx.translate(f.x, f.y);
-                if (f.stealthTimer > 0 && isAlly) ctx.globalAlpha = 0.42;
+                if ((f.inBush || f.stealthTimer > 0) && isAlly) ctx.globalAlpha = 0.52;
 
-                let jumpScale = 1;
-                if (f.jumping) jumpScale = 1 + Math.sin((f.jumpTimer / f.jumpDuration) * Math.PI) * 0.65;
-
-                // エメラルド所持キャラの足元オーラリング
-                if (activeMode === 'gemgrab' && f.gems > 0 && !f.jumping) {
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.ellipse(0, f.radius * 0.58, f.radius * 1.45, f.radius * 0.98, 0, 0, Math.PI * 2);
-                    ctx.lineWidth = 4;
-                    ctx.strokeStyle = f.gems >= 10 ? '#facc15' : '#e879f9';
-                    ctx.stroke();
-                    ctx.restore();
-                }
-
-                const isMoving = Math.hypot(f.vx, f.vy) > 15;
-                drawBrawlerArt(ctx, f.brawler, f.radius, f.facing, f.walkPhase, isAlly ? 'blue' : 'red', f.superCharge >= 1.0, jumpScale, {
-                    time: globalAnimTime,
-                    recoil: f.recoilTimer / 0.22,
-                    isMoving,
-                    pose: 'battle',
-                    isHyper: f.hyperTimer > 0,
-                    isPoisoned: !!f.poisonState,
-                    landSquash: f.landSquash,
-                    hitPop: f.hitPop
-                });
-
-                if (f.hitFlash > 0) {
-                    ctx.beginPath(); ctx.arc(0, 0, f.radius * 0.88, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.55)'; ctx.fill();
+                let jumpScale = 1, jumpOffsetY = 0;
+                if (f.jumping) {
+                    const prog = Math.min(1, f.jumpTimer / f.jumpDuration);
+                    const arc = Math.sin(prog * Math.PI);
+                    jumpScale = 1 + arc * 0.65; jumpOffsetY = -arc * 85;
                 }
 
                 if (f.spawnShieldTimer > 0) {
-                    ctx.beginPath(); ctx.arc(0, 0, f.radius + 9, 0, Math.PI * 2);
-                    ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 4; ctx.stroke();
-                    ctx.fillStyle = 'rgba(56, 189, 246, 0.22)'; ctx.fill();
-                }
-
-                // スパイク改の常時70%ダメージ軽減ゴールデンシールド描画
-                if (f.spec && f.spec.passiveDamageReduction) {
-                    ctx.save();
-                    ctx.rotate(globalAnimTime * 1.8);
-                    ctx.beginPath(); ctx.arc(0, 0, f.radius + 11, 0, Math.PI * 2);
-                    ctx.strokeStyle = '#facc15'; ctx.lineWidth = 3.5;
-                    ctx.setLineDash([12, 6]); ctx.stroke();
-                    ctx.setLineDash([]);
-                    ctx.fillStyle = 'rgba(250, 204, 21, 0.16)'; ctx.fill();
-                    ctx.restore();
+                    ctx.beginPath(); ctx.arc(f.x, f.y, f.radius + 11, 0, Math.PI * 2);
+                    ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 3.5; ctx.stroke();
                 }
 
                 if (f.shieldTimer > 0) {
-                    ctx.beginPath(); ctx.arc(0, 0, f.radius + 8, 0, Math.PI * 2);
-                    ctx.strokeStyle = '#a855f7'; ctx.lineWidth = 4; ctx.stroke();
-                    ctx.fillStyle = 'rgba(168, 85, 247, 0.25)'; ctx.fill();
+                    ctx.beginPath(); ctx.arc(f.x, f.y, f.radius + 14, 0, Math.PI * 2);
+                    ctx.strokeStyle = '#4ade80'; ctx.lineWidth = 4; ctx.stroke();
+                }
+
+                if (f.spec && f.spec.passiveDamageReduction) {
+                    ctx.save();
+                    ctx.translate(f.x, f.y);
+                    ctx.rotate(globalAnimTime * 2.4);
+                    ctx.beginPath();
+                    ctx.arc(0, 0, f.radius + 15, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(250, 204, 21, 0.85)';
+                    ctx.lineWidth = 3.5;
+                    ctx.setLineDash([12, 6]);
+                    ctx.stroke();
+                    ctx.restore();
                 }
 
                 if (f.stunTimer > 0) {
                     ctx.fillStyle = '#fde047';
                     ctx.font = '900 13px sans-serif';
                     ctx.textAlign = 'center';
-                    ctx.fillText('⚡STUN!', 0, -f.radius - 42);
-                }
-
-                ctx.restore();
-
-                if (!f.jumping) {
-                    const barW = 54, barH = 8, bx = f.x - barW / 2, by = f.y - f.radius - 28;
-                    ctx.fillStyle = '#000'; ctx.fillRect(bx - 2, by - 2, barW + 4, barH + 4);
-                    ctx.fillStyle = isAlly ? '#22c55e' : '#ef4444'; ctx.fillRect(bx, by, barW * (f.hp / f.maxHp), barH);
-
-                    ctx.font = '900 11px "M PLUS Rounded 1c", sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.fillStyle = '#fff';
-                    ctx.strokeStyle = '#000';
-                    ctx.lineWidth = 3;
-                    ctx.strokeText(f.hp, f.x, by - 4);
-                    ctx.fillText(f.hp, f.x, by - 4);
-
-                    // エメラルド所持数バッジを頭上にハッキリ大きく表示（誰が何個持っているか一目瞭然）
-                    if (activeMode === 'gemgrab' && f.gems > 0) {
-                        const badgeText = `💎 ×${f.gems}`;
-                        ctx.font = '900 13px "M PLUS Rounded 1c", sans-serif';
-                        const tw = ctx.measureText(badgeText).width + 14;
-                        const badgeY = by - 36;
-                        ctx.fillStyle = f.gems >= 10 ? '#facc15' : '#4a044e';
-                        ctx.strokeStyle = '#000';
-                        ctx.lineWidth = 2.5;
-                        ctx.beginPath();
-                        ctx.roundRect(f.x - tw / 2, badgeY - 12, tw, 18, 9);
-                        ctx.fill();
-                        ctx.stroke();
-
-                        ctx.fillStyle = f.gems >= 10 ? '#000000' : '#f5d0fe';
-                        ctx.fillText(badgeText, f.x, badgeY + 1);
-                    }
-
-                    if (f.isPlayer) {
-                        const ammoY = by + barH + 3;
-                        const slotW = (barW - 4) / 3;
-                        for (let a = 0; a < 3; a++) {
-                            ctx.fillStyle = '#000'; ctx.fillRect(bx + a * (slotW + 2) - 1, ammoY - 1, slotW + 2, 6);
-                            let fillRatio = f.ammo >= a + 1 ? 1 : (Math.floor(f.ammo) === a ? f.reloadTimer / f.spec.reloadTime : 0);
-                            ctx.fillStyle = fillRatio >= 1 ? '#fb923c' : '#94a3b8';
-                            ctx.fillRect(bx + a * (slotW + 2), ammoY, slotW * fillRatio, 4);
-                        }
-                    }
-                }
-            }
-
-            // 弾丸描画（弾道リボン＆ナジアの毒蛇ビジュアル含む）
-            for (const b of bullets) {
-                if (b.trail && b.trail.length > 1) {
-                    ctx.save();
-                    for (let ti = 1; ti < b.trail.length; ti++) {
-                        const alpha = (ti / b.trail.length) * 0.35;
-                        ctx.beginPath();
-                        ctx.moveTo(b.trail[ti - 1].x, b.trail[ti - 1].y);
-                        ctx.lineTo(b.trail[ti].x, b.trail[ti].y);
-                        ctx.strokeStyle = b.color;
-                        ctx.globalAlpha = alpha;
-                        ctx.lineWidth = b.radius * (ti / b.trail.length) * 1.45;
-                        ctx.lineCap = 'round';
-                        ctx.stroke();
-                    }
-                    ctx.restore();
+                    ctx.fillText('⚡ STUNNED', f.x, f.y - f.radius - 38);
                 }
 
                 ctx.save();
-                ctx.translate(b.x, b.y);
+                ctx.translate(f.x, f.y + jumpOffsetY);
+                drawBrawlerArt(ctx, f.brawler, f.radius, f.facing, f.walkPhase, isAlly ? 'blue' : 'red', f.superCharge >= 1.0, jumpScale, {
+                    time: globalAnimTime,
+                    recoil: f.recoilTimer > 0 ? (f.recoilTimer / 0.22) : 0,
+                    isMoving: Math.hypot(f.vx, f.vy) > 15,
+                    pose: 'battle',
+                    isHyper: f.hyperTimer > 0,
+                    isPoisoned: !!f.poisonState,
+                    landSquash: f.landSquash || 0,
+                    hitPop: f.hitPop || 0
+                });
+                ctx.restore();
+
+                const barW = 54, barH = 7;
+                const bx = f.x - barW / 2, by = f.y - f.radius - 26 + jumpOffsetY;
+                ctx.fillStyle = '#000'; ctx.fillRect(bx - 1.5, by - 1.5, barW + 3, barH + 3);
+                ctx.fillStyle = isAlly ? '#22c55e' : '#ef4444';
+                ctx.fillRect(bx, by, barW * Math.max(0, f.hp / f.maxHp), barH);
+
+                if (f.isPlayer) {
+                    const ammoY = by + barH + 3;
+                    const slotW = (barW - 4) / 3;
+                    for (let a = 0; a < 3; a++) {
+                        ctx.fillStyle = '#000'; ctx.fillRect(bx + a * (slotW + 2) - 1, ammoY - 1, slotW + 2, 5);
+                        ctx.fillStyle = a < Math.floor(f.ammo) ? '#f97316' : '#475569';
+                        ctx.fillRect(bx + a * (slotW + 2), ammoY, slotW, 3);
+                    }
+                }
+
+                ctx.font = '900 11px "M PLUS Rounded 1c", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+                const label = f.isDecoy ? `${f.name}` : (f.gems > 0 ? `💎${f.gems} ${f.name}` : (f.cubes > 0 ? `⚡${f.cubes} ${f.name}` : f.name));
+                ctx.strokeText(label, f.x, by - 5);
+                ctx.fillStyle = f.isPlayer ? '#facc15' : '#fff';
+                ctx.fillText(label, f.x, by - 5);
+
+                if (activeMode === 'gemgrab' && !f.isDecoy) {
+                    const gemBadgeY = f.y + f.radius + 16 + jumpOffsetY;
+                    const gemBadgeText = `💎 ${f.gems}`;
+                    ctx.font = '900 11px "M PLUS Rounded 1c", sans-serif';
+                    ctx.fillStyle = f.gems > 0 ? 'rgba(74, 4, 78, 0.92)' : 'rgba(15, 23, 42, 0.78)';
+                    ctx.strokeStyle = f.gems > 0 ? '#f0abfc' : '#64748b';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.roundRect(f.x - 22, gemBadgeY - 10, 44, 14, 7);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.fillStyle = f.gems > 0 ? '#f5d0fe' : '#cbd5e1';
+                    ctx.fillText(gemBadgeText, f.x, gemBadgeY + 1);
+                }
+
+                ctx.restore();
+            }
+
+            // 放物線投擲弾の描画
+            for (const lp of lobProjectiles) {
+                const progress = Math.min(1, lp.elapsed / lp.duration);
+                const arcZ = Math.sin(progress * Math.PI) * lp.arcHeight;
+
+                ctx.save();
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+                ctx.beginPath();
+                ctx.ellipse(lp.x, lp.y, 12, 7, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.translate(lp.x, lp.y - arcZ);
+                ctx.rotate(lp.spin);
+                const scale = 1 + Math.sin(progress * Math.PI) * 0.45;
+                ctx.scale(scale, scale);
+
+                ctx.fillStyle = '#16a34a';
+                ctx.strokeStyle = '#facc15';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(0, 0, 12, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = '#fef08a';
+                ctx.beginPath();
+                ctx.arc(0, 0, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 弾丸描画
+            for (const b of bullets) {
+                if (b.trail && b.trail.length > 1) {
+                    for (let ti = 0; ti < b.trail.length; ti++) {
+                        const tp = b.trail[ti];
+                        const ratio = (ti + 1) / b.trail.length;
+                        ctx.save();
+                        ctx.globalAlpha = ratio * 0.36;
+                        ctx.fillStyle = b.color;
+                        ctx.beginPath();
+                        ctx.arc(tp.x, tp.y, b.radius * ratio * 0.9, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    }
+                }
+
+                ctx.save(); ctx.translate(b.x, b.y);
                 if (b.isNajiaSnake) {
-                    const ang = Math.atan2(b.vy, b.vx);
-                    ctx.rotate(ang);
-                    ctx.fillStyle = b.isNajiaSuper ? '#65a30d' : '#a3e635';
-                    ctx.strokeStyle = '#000';
-                    ctx.lineWidth = 2.5;
+                    ctx.rotate(Math.atan2(b.vy, b.vx));
+                    ctx.fillStyle = b.color; ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5;
                     ctx.beginPath();
                     ctx.ellipse(0, 0, b.radius * 1.45, b.radius * 0.85, 0, 0, Math.PI * 2);
                     ctx.fill(); ctx.stroke();
-                    ctx.fillStyle = '#fef08a';
+                    ctx.fillStyle = '#facc15';
                     ctx.beginPath();
-                    ctx.arc(b.radius * 0.55, -b.radius * 0.3, 2.2, 0, Math.PI * 2);
-                    ctx.arc(b.radius * 0.55, b.radius * 0.3, 2.2, 0, Math.PI * 2);
+                    ctx.arc(b.radius * 0.55, -b.radius * 0.35, 2.5, 0, Math.PI * 2);
+                    ctx.arc(b.radius * 0.55, b.radius * 0.35, 2.5, 0, Math.PI * 2);
                     ctx.fill();
                 } else if (b.isSpikeGrenade || b.isLeonBlade) {
                     ctx.rotate(b.spin || 0);
                     ctx.fillStyle = b.color; ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
-                    ctx.fillRect(-b.radius, -b.radius, b.radius * 2, b.radius * 2);
-                    ctx.strokeRect(-b.radius, -b.radius, b.radius * 2, b.radius * 2);
-                } else {
-                    ctx.beginPath(); ctx.arc(0, 0, b.radius, 0, Math.PI * 2);
-                    ctx.fillStyle = b.color; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#000'; ctx.stroke();
-                }
-                ctx.restore();
-            }
-
-            // スパイク改の壁越え放物線ロブボール描画（地面の影＋高さスケール表現）
-            for (const lp of lobProjectiles) {
-                const t = Math.min(1, lp.elapsed / lp.duration);
-                const height = Math.sin(t * Math.PI) * lp.arcHeight;
-                const ballScale = 1 + Math.sin(t * Math.PI) * 0.75;
-
-                // 地面の影
-                ctx.save();
-                ctx.translate(lp.x, lp.y);
-                ctx.beginPath();
-                ctx.ellipse(0, 8, 12 * (1 - Math.sin(t * Math.PI) * 0.35), 7 * (1 - Math.sin(t * Math.PI) * 0.35), 0, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
-                ctx.fill();
-                ctx.restore();
-
-                // 空中のトゲボール本体
-                ctx.save();
-                ctx.translate(lp.x, lp.y - height);
-                ctx.scale(ballScale, ballScale);
-                ctx.rotate(lp.spin);
-                ctx.beginPath();
-                ctx.arc(0, 0, 12, 0, Math.PI * 2);
-                ctx.fillStyle = '#22c55e';
-                ctx.fill();
-                ctx.lineWidth = 3;
-                ctx.strokeStyle = '#facc15';
-                ctx.stroke();
-                // トゲの突起
-                ctx.fillStyle = '#fef08a';
-                for (let sp = 0; sp < 6; sp++) {
-                    const sa = (sp / 6) * Math.PI * 2;
                     ctx.beginPath();
-                    ctx.arc(Math.cos(sa) * 11, Math.sin(sa) * 11, 3, 0, Math.PI * 2);
-                    ctx.fill();
+                    for (let s = 0; s < 4; s++) {
+                        const a = (s / 4) * Math.PI * 2;
+                        ctx.lineTo(Math.cos(a) * (b.radius + 5), Math.sin(a) * (b.radius + 5));
+                        ctx.lineTo(Math.cos(a + 0.78) * 3, Math.sin(a + 0.78) * 3);
+                    }
+                    ctx.closePath(); ctx.fill(); ctx.stroke();
+                } else {
+                    ctx.fillStyle = b.color; ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5;
+                    ctx.beginPath(); ctx.arc(0, 0, b.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
                 }
                 ctx.restore();
             }
 
-            // 毒ガスエリア描画
+            for (const pt of particles) {
+                ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife);
+                ctx.fillStyle = pt.color;
+                ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+
             if (activeMode === 'showdown' || (activeMode === 'knockout' && koRoundTimer < 25)) {
                 ctx.save();
                 ctx.beginPath();
-                ctx.rect(0, 0, MAP_W, MAP_H);
+                ctx.rect(camera.x - halfW - 100, camera.y - halfH - 100, halfW * 2 + 200, halfH * 2 + 200);
                 ctx.arc(MAP_W / 2, MAP_H / 2, poisonRadius, 0, Math.PI * 2, true);
-                ctx.fillStyle = 'rgba(16, 185, 129, 0.36)';
+                ctx.fillStyle = 'rgba(22, 163, 74, 0.38)';
                 ctx.fill();
-                ctx.beginPath();
-                ctx.arc(MAP_W / 2, MAP_H / 2, poisonRadius, 0, Math.PI * 2);
-                ctx.lineWidth = 6; ctx.strokeStyle = '#34d399'; ctx.stroke();
+                ctx.beginPath(); ctx.arc(MAP_W / 2, MAP_H / 2, poisonRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = '#4ade80'; ctx.lineWidth = 6; ctx.stroke();
                 ctx.restore();
             }
-
-            // 壁描画（手前重ね）
-            for (let r = startRow; r <= endRow; r++) {
-                for (let c = startCol; c <= endCol; c++) {
-                    const t = mapGrid[r][c];
-                    if (t === 1 || t === 2) {
-                        const x = c * TILE_SIZE, y = r * TILE_SIZE;
-                        ctx.fillStyle = t === 1 ? '#475569' : '#d97706'; ctx.fillRect(x, y - 10, TILE_SIZE, TILE_SIZE + 10);
-                        ctx.fillStyle = t === 1 ? '#64748b' : '#f59e0b'; ctx.fillRect(x + 4, y - 6, TILE_SIZE - 8, TILE_SIZE - 14);
-                        ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 3; ctx.strokeRect(x + 1.5, y - 8.5, TILE_SIZE - 3, TILE_SIZE + 7);
-                    }
-                }
-            }
-
-            for (const pt of particles) { ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife); ctx.fillStyle = pt.color; ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2); ctx.fill(); }
-            ctx.globalAlpha = 1;
 
             for (const ft of floatingTexts) {
                 ctx.save();
-                ctx.globalAlpha = Math.min(1, ft.life * 1.5);
-                ctx.font = `900 ${Math.round(18 * ft.scale)}px "M PLUS Rounded 1c", sans-serif`;
-                ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.strokeText(ft.text, ft.x, ft.y);
-                ctx.fillStyle = ft.color; ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.globalAlpha = Math.min(1, ft.life * 2);
+                ctx.font = `900 ${Math.round(16 * ft.scale)}px "M PLUS Rounded 1c", sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
+                ctx.strokeText(ft.text, ft.x, ft.y);
+                ctx.fillStyle = ft.color;
+                ctx.fillText(ft.text, ft.x, ft.y);
                 ctx.restore();
             }
 
             ctx.restore();
         }
 
-        function drawWorldAimReticle(player, angle, pullRatio, isSuper) {
-            ctx.save();
-            const isBallCarry = activeMode === 'brawlball' && soccerBall && soccerBall.carrier === player;
-            const aimType = isBallCarry ? 'line' : (isSuper ? (player.spec.superAimType || player.spec.aimType) : player.spec.aimType);
-            const maxR = isBallCarry ? 640 : (isSuper ? (player.spec.superRange || player.spec.range * 1.2) : player.spec.range);
+        function traceAimBouncePath(startX, startY, angle, maxRange, maxBounces) {
+            const pts = [{ x: startX, y: startY }];
+            let cx = startX, cy = startY;
+            let vx = Math.cos(angle), vy = Math.sin(angle);
+            let rem = maxRange;
+            let bounces = maxBounces;
+            const step = 10;
 
-            if (aimType === 'lob') {
-                const dist = Math.max(70, pullRatio * maxR);
-                const tx = Math.max(48, Math.min(MAP_W - 48, player.x + Math.cos(angle) * dist));
-                const ty = Math.max(48, Math.min(MAP_H - 48, player.y + Math.sin(angle) * dist));
-                const splashR = isSuper ? (player.spec.superRadius || 120) : 55;
-
-                ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.lineTo(tx, ty);
-                ctx.strokeStyle = isSuper ? 'rgba(250, 204, 21, 0.7)' : 'rgba(74, 222, 128, 0.7)';
-                ctx.lineWidth = 4; ctx.setLineDash([8, 8]); ctx.stroke(); ctx.setLineDash([]);
-
-                ctx.beginPath(); ctx.arc(tx, ty, splashR, 0, Math.PI * 2);
-                ctx.fillStyle = isSuper ? 'rgba(250, 204, 21, 0.25)' : 'rgba(74, 222, 128, 0.25)'; ctx.fill();
-                ctx.lineWidth = 3; ctx.strokeStyle = isSuper ? '#facc15' : '#4ade80'; ctx.stroke();
-            } else if (aimType === 'bounce') {
-                let cx = player.x, cy = player.y;
-                let vx = Math.cos(angle), vy = Math.sin(angle);
-                let rem = maxR;
-                ctx.beginPath();
-                ctx.moveTo(cx, cy);
-                let bounces = 2;
-                while (rem > 0) {
-                    const step = 16;
-                    const nx = cx + vx * step;
-                    const ny = cy + vy * step;
-                    const tc = Math.floor(nx / TILE_SIZE), tr = Math.floor(ny / TILE_SIZE);
-                    if (tr >= 0 && tr < MAP_ROWS && tc >= 0 && tc < MAP_COLS && (mapGrid[tr][tc] === 1 || mapGrid[tr][tc] === 2)) {
-                        if (bounces > 0) {
-                            bounces--;
-                            const prevC = Math.floor(cx / TILE_SIZE), prevR = Math.floor(cy / TILE_SIZE);
-                            if (prevC !== tc && prevR === tr) vx = -vx;
-                            else if (prevR !== tr && prevC === tc) vy = -vy;
-                            else { vx = -vx; vy = -vy; }
-                        } else {
-                            break;
-                        }
-                    } else {
-                        cx = nx; cy = ny;
-                        ctx.lineTo(cx, cy);
-                    }
+            while (rem > 0) {
+                const nx = cx + vx * step;
+                const ny = cy + vy * step;
+                const col = Math.floor(nx / TILE_SIZE);
+                const row = Math.floor(ny / TILE_SIZE);
+                if (row < 0 || row >= MAP_ROWS || col < 0 || col >= MAP_COLS) {
+                    pts.push({ x: cx, y: cy });
+                    break;
+                }
+                const tile = mapGrid[row][col];
+                if (tile === 1 || tile === 2) {
+                    pts.push({ x: cx, y: cy });
+                    if (bounces <= 0) break;
+                    bounces--;
+                    rem += 90;
+                    const tcX = col * TILE_SIZE + TILE_SIZE / 2;
+                    const tcY = row * TILE_SIZE + TILE_SIZE / 2;
+                    if (Math.abs(cx - tcX) > Math.abs(cy - tcY)) vx = -vx;
+                    else vy = -vy;
+                } else {
+                    cx = nx;
+                    cy = ny;
                     rem -= step;
                 }
-                ctx.strokeStyle = isSuper ? 'rgba(250, 204, 21, 0.85)' : 'rgba(56, 189, 248, 0.85)';
-                ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.stroke();
+            }
+            pts.push({ x: cx, y: cy });
+            return pts;
+        }
+
+        function renderAimGuide(player, angle, pullRatio, isSuper) {
+            if (activeMode === 'brawlball' && soccerBall && soccerBall.carrier === player) {
+                const kickRange = isSuper ? 960 : 740;
+                ctx.save();
+                ctx.fillStyle = isSuper ? 'rgba(250, 204, 21, 0.35)' : 'rgba(56, 189, 248, 0.32)';
+                ctx.strokeStyle = isSuper ? '#facc15' : '#38bdf8';
+                ctx.lineWidth = 3;
+                ctx.translate(player.x, player.y);
+                ctx.rotate(angle);
+                ctx.fillRect(0, -14, kickRange, 28);
+                ctx.strokeRect(0, -14, kickRange, 28);
+                ctx.restore();
+                return;
+            }
+
+            const spec = player.spec;
+            const aimType = isSuper && spec.superAimType ? spec.superAimType : spec.aimType;
+            const maxR = isSuper && spec.superRange ? spec.superRange : spec.range;
+            const fillColor = isSuper ? 'rgba(250, 204, 21, 0.28)' : 'rgba(255, 255, 255, 0.26)';
+            const strokeColor = isSuper ? '#facc15' : 'rgba(255, 255, 255, 0.8)';
+
+            ctx.save();
+            ctx.fillStyle = fillColor; ctx.strokeStyle = strokeColor; ctx.lineWidth = 3;
+
+            if (aimType === 'bounce') {
+                const pts = traceAimBouncePath(player.x, player.y, angle, maxR, isSuper ? 4 : 3);
+                ctx.strokeStyle = isSuper ? 'rgba(250, 204, 21, 0.8)' : 'rgba(56, 189, 248, 0.8)';
+                ctx.lineWidth = 14;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                pts.forEach((pt, idx) => {
+                    if (idx === 0) ctx.moveTo(pt.x, pt.y);
+                    else ctx.lineTo(pt.x, pt.y);
+                });
+                ctx.stroke();
+
+                const lastPt = pts[pts.length - 1];
+                ctx.fillStyle = isSuper ? '#facc15' : '#38bdf8';
+                ctx.beginPath(); ctx.arc(lastPt.x, lastPt.y, 10, 0, Math.PI * 2); ctx.fill();
+            } else if (aimType === 'lob') {
+                const dist = Math.max(70, Math.min(maxR, maxR * Math.max(0.25, pullRatio)));
+                const tx = player.x + Math.cos(angle) * dist;
+                const ty = player.y + Math.sin(angle) * dist;
+                const rad = isSuper ? spec.superRadius : 62;
+                ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.lineTo(tx, ty); ctx.setLineDash([8, 8]); ctx.stroke(); ctx.setLineDash([]);
+                ctx.beginPath(); ctx.arc(tx, ty, rad, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
             } else if (aimType === 'cone') {
-                const spread = isSuper ? 0.56 : (player.spec.spread || 0.35);
-                ctx.beginPath(); ctx.moveTo(player.x, player.y);
-                ctx.arc(player.x, player.y, maxR, angle - spread / 2, angle + spread / 2); ctx.closePath();
-                ctx.fillStyle = isSuper ? 'rgba(250, 204, 21, 0.25)' : 'rgba(255, 255, 255, 0.22)'; ctx.fill();
-                ctx.lineWidth = 3; ctx.strokeStyle = isSuper ? '#facc15' : '#ffffff'; ctx.stroke();
+                const spread = isSuper ? 0.56 : spec.spread;
+                ctx.translate(player.x, player.y); ctx.rotate(angle);
+                ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, maxR, -spread / 2, spread / 2); ctx.closePath(); ctx.fill(); ctx.stroke();
             } else {
-                const ex = player.x + Math.cos(angle) * maxR, ey = player.y + Math.sin(angle) * maxR;
-                ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.lineTo(ex, ey);
-                ctx.strokeStyle = isBallCarry ? 'rgba(56, 189, 248, 0.65)' : (isSuper ? 'rgba(250, 204, 21, 0.45)' : 'rgba(255, 255, 255, 0.4)');
-                ctx.lineWidth = isBallCarry ? 26 : (isSuper ? 30 : 20); ctx.lineCap = 'round'; ctx.stroke();
+                const width = isSuper ? 42 : 26;
+                ctx.translate(player.x, player.y); ctx.rotate(angle);
+                ctx.fillRect(0, -width / 2, maxR, width); ctx.strokeRect(0, -width / 2, maxR, width);
             }
             ctx.restore();
         }
-
-        // ========================================================================
-        // 13. UI＆操作イベント
-        // ========================================================================
-        function updateSelectedGadgetBanner(bId) {
-            const spec = BRAWLERS[bId];
-            if (!spec) return;
-            document.getElementById('selectedGadgetBanner').textContent = `${spec.gadgetIcon} ガジェット：${spec.gadgetName}（${spec.gadgetDesc}／クールダウン制）`;
-        }
-
-        document.querySelectorAll('#brawlerSelectGrid .brawl-card').forEach(card => {
-            card.addEventListener('click', () => {
-                sound.playClick();
-                document.querySelectorAll('#brawlerSelectGrid .brawl-card').forEach(c => c.classList.remove('selected'));
-                card.classList.add('selected');
-                selectedBrawler = card.dataset.brawler;
-                updateSelectedGadgetBanner(selectedBrawler);
-            });
-        });
-
-        const btnQueueNormal = document.getElementById('btnQueueNormal');
-        const btnQueueRanked = document.getElementById('btnQueueRanked');
-        const normalModeWrapper = document.getElementById('normalModeWrapper');
-        const rankedInfoWrapper = document.getElementById('rankedInfoWrapper');
-
-        btnQueueNormal.addEventListener('click', () => {
-            sound.playClick();
-            queueType = 'normal';
-            btnQueueNormal.classList.add('ring-2', 'ring-yellow-300');
-            btnQueueRanked.classList.remove('ring-2', 'ring-yellow-300');
-            btnQueueRanked.classList.add('opacity-80');
-            btnQueueNormal.classList.remove('opacity-80');
-            normalModeWrapper.classList.remove('hidden');
-            rankedInfoWrapper.classList.add('hidden');
-        });
-
-        btnQueueRanked.addEventListener('click', () => {
-            sound.playClick();
-            queueType = 'ranked';
-            btnQueueRanked.classList.add('ring-2', 'ring-yellow-300');
-            btnQueueNormal.classList.remove('ring-2', 'ring-yellow-300');
-            btnQueueNormal.classList.add('opacity-80');
-            btnQueueRanked.classList.remove('opacity-80');
-            normalModeWrapper.classList.add('hidden');
-            rankedInfoWrapper.classList.remove('hidden');
-        });
-
-        document.querySelectorAll('#modeSelectGrid .brawl-card').forEach(card => {
-            card.addEventListener('click', () => {
-                sound.playClick();
-                document.querySelectorAll('#modeSelectGrid .brawl-card').forEach(c => c.classList.remove('selected'));
-                card.classList.add('selected');
-                selectedNormalMode = card.dataset.mode;
-            });
-        });
-
-        document.getElementById('btnStartBattle').addEventListener('click', startMatch);
-        document.getElementById('btnRetry').addEventListener('click', startMatch);
-        document.getElementById('btnBackHome').addEventListener('click', () => {
-            sound.playClick();
-            gameState = 'LOBBY';
-            if (resultAnimFrameId) {
-                cancelAnimationFrame(resultAnimFrameId);
-                resultAnimFrameId = null;
-            }
-            updateLobbyRankDisplay();
-            document.getElementById('resultScreen').classList.add('hidden');
-            document.getElementById('battleHud').classList.add('hidden');
-            document.getElementById('btnQuit').classList.add('hidden');
-            document.getElementById('topRightGlobalControls').classList.remove('hidden');
-            document.getElementById('deadOverlayPanel').classList.add('hidden');
-            document.getElementById('lobbyScreen').classList.remove('hidden');
-        });
-
-        document.getElementById('btnQuit').addEventListener('click', () => {
-            sound.playClick();
-            gameState = 'LOBBY';
-            updateLobbyRankDisplay();
-            document.getElementById('battleHud').classList.add('hidden');
-            document.getElementById('btnQuit').classList.add('hidden');
-            document.getElementById('centerSplash').classList.add('hidden');
-            document.getElementById('deadOverlayPanel').classList.add('hidden');
-            document.getElementById('lobbyScreen').classList.remove('hidden');
-        });
-
-        document.getElementById('btnMute').addEventListener('click', () => {
-            const isMuted = sound.toggleMute();
-            document.getElementById('muteIcon').textContent = isMuted ? '🔇' : '🔊';
-        });
-
-        document.getElementById('btnReport').addEventListener('click', () => {
-            sound.playClick();
-            const toast = document.getElementById('reportToast');
-            toast.classList.remove('hidden');
-            setTimeout(() => toast.classList.add('hidden'), 2500);
-        });
-
-        document.getElementById('btnProfileOpen').addEventListener('click', () => {
-            sound.playClick();
-            const st = getRankState(profile.rp);
-            document.getElementById('modalRankName').textContent = st.name;
-            document.getElementById('modalRankPoints').textContent = `${profile.rp} RP / 🏆 ${profile.trophies || 0}`;
-            const winRate = profile.matches > 0 ? Math.round((profile.wins / profile.matches) * 100) : 0;
-            document.getElementById('modalMatches').textContent = `${profile.matches}戦 ${profile.wins}勝 (勝率 ${winRate}%)`;
-            document.getElementById('modalKills').textContent = `${profile.kills} 撃破`;
-            document.getElementById('profileModal').classList.remove('hidden');
-        });
-        document.getElementById('btnCloseProfile').addEventListener('click', () => {
-            sound.playClick();
-            document.getElementById('profileModal').classList.add('hidden');
-        });
-
-        document.getElementById('gadgetBtnZone').addEventListener('click', () => {
-            const p = getPlayer();
-            if (p) activateGadget(p);
-        });
-        document.getElementById('hyperBtnZone').addEventListener('click', () => {
-            const p = getPlayer();
-            if (p) activateHypercharge(p);
-        });
-
-        window.addEventListener('keydown', e => {
-            keys[e.code] = true;
-            if (e.code === 'Space' && gameState === 'PLAYING') {
-                e.preventDefault();
-                const p = getPlayer();
-                if (p && p.alive) {
-                    const auto = getAutoAimTarget(p, p.spec.superRange || p.spec.range * 1.2, true);
-                    executeAttack(p, auto.angle, true, auto.dist);
-                }
-            } else if (e.code === 'KeyG' && gameState === 'PLAYING') {
-                e.preventDefault();
-                const p = getPlayer();
-                if (p) activateGadget(p);
-            } else if (e.code === 'KeyH' && gameState === 'PLAYING') {
-                e.preventDefault();
-                const p = getPlayer();
-                if (p) activateHypercharge(p);
-            }
-        });
-        window.addEventListener('keyup', e => { keys[e.code] = false; });
-
-        const leftTouchArea = document.getElementById('leftTouchArea');
-        const floatingBase = document.getElementById('floatingMoveBase');
-        const floatingKnob = document.getElementById('floatingMoveKnob');
-
-        leftTouchArea.addEventListener('touchstart', e => {
-            if (gameState !== 'PLAYING' || moveStick.active) return;
-            const t = e.changedTouches[0];
-            moveStick.active = true; moveStick.id = t.identifier;
-            moveStick.startX = t.clientX; moveStick.startY = t.clientY;
-            moveStick.dx = 0; moveStick.dy = 0;
-            floatingBase.style.left = `${t.clientX}px`; floatingBase.style.top = `${t.clientY}px`;
-            floatingBase.classList.remove('hidden'); floatingKnob.style.transform = 'translate(0px, 0px)';
-        }, { passive: true });
-
-        leftTouchArea.addEventListener('touchmove', e => {
-            if (!moveStick.active) return;
-            for (const t of e.changedTouches) {
-                if (t.identifier === moveStick.id) {
-                    const maxR = 46, rawX = t.clientX - moveStick.startX, rawY = t.clientY - moveStick.startY;
-                    const dist = Math.hypot(rawX, rawY), clamped = Math.min(maxR, dist), ang = Math.atan2(rawY, rawX);
-                    const kx = Math.cos(ang) * clamped, ky = Math.sin(ang) * clamped;
-                    floatingKnob.style.transform = `translate(${kx}px, ${ky}px)`;
-                    moveStick.dx = kx / maxR; moveStick.dy = ky / maxR;
-                }
-            }
-        }, { passive: true });
-
-        const endMoveTouch = e => {
-            for (const t of e.changedTouches) {
-                if (t.identifier === moveStick.id) {
-                    moveStick.active = false; moveStick.id = null; moveStick.dx = 0; moveStick.dy = 0;
-                    floatingBase.classList.add('hidden');
-                }
-            }
-        };
-        leftTouchArea.addEventListener('touchend', endMoveTouch, { passive: true });
-        leftTouchArea.addEventListener('touchcancel', endMoveTouch, { passive: true });
-
-        function setupActionStick(zoneId, knobId, isSuper) {
-            const zone = document.getElementById(zoneId);
-            const knob = document.getElementById(knobId);
-
-            zone.addEventListener('touchstart', e => {
-                e.preventDefault();
-                if (gameState !== 'PLAYING') return;
-                const p = getPlayer();
-                if (!p || !p.alive) return;
-                const hasBall = activeMode === 'brawlball' && soccerBall && soccerBall.carrier === p;
-                if (isSuper && p.superCharge < 1.0 && !hasBall) return;
-
-                const t = e.changedTouches[0];
-                const rect = zone.getBoundingClientRect();
-                attackStick.active = true; attackStick.id = t.identifier;
-                attackStick.startX = rect.left + rect.width / 2; attackStick.startY = rect.top + rect.height / 2;
-                attackStick.isSuper = isSuper; attackStick.dragged = false;
-                attackStick.angle = p.facing; attackStick.pullRatio = 0.75;
-            }, { passive: false });
-
-            zone.addEventListener('touchmove', e => {
-                if (!attackStick.active || attackStick.isSuper !== isSuper) return;
-                for (const t of e.changedTouches) {
-                    if (t.identifier === attackStick.id) {
-                        const maxR = 42, rawX = t.clientX - attackStick.startX, rawY = t.clientY - attackStick.startY;
-                        const dist = Math.hypot(rawX, rawY);
-                        if (dist > 10) attackStick.dragged = true;
-                        const clamped = Math.min(maxR, dist), ang = Math.atan2(rawY, rawX);
-                        knob.style.transform = `translate(${Math.cos(ang) * clamped}px, ${Math.sin(ang) * clamped}px)`;
-                        attackStick.angle = ang; attackStick.pullRatio = clamped / maxR;
-                    }
-                }
-            }, { passive: true });
-
-            const releaseAction = e => {
-                for (const t of e.changedTouches) {
-                    if (t.identifier === attackStick.id && attackStick.isSuper === isSuper) {
-                        knob.style.transform = 'translate(0px, 0px)';
-                        const p = getPlayer();
-                        if (p && p.alive && gameState === 'PLAYING') {
-                            const maxR = isSuper ? (p.spec.superRange || p.spec.range * 1.2) : p.spec.range;
-                            if (!attackStick.dragged) {
-                                const auto = getAutoAimTarget(p, maxR, true);
-                                executeAttack(p, auto.angle, isSuper, auto.dist);
-                            } else {
-                                executeAttack(p, attackStick.angle, isSuper, attackStick.pullRatio * maxR);
-                            }
-                        }
-                        attackStick.active = false; attackStick.id = null; attackStick.dragged = false;
-                    }
-                }
-            };
-            zone.addEventListener('touchend', releaseAction, { passive: true });
-            zone.addEventListener('touchcancel', releaseAction, { passive: true });
-        }
-
-        setupActionStick('attackStickZone', 'attackStickKnob', false);
-        setupActionStick('superStickZone', 'superStickKnob', true);
-
-        canvas.addEventListener('mousedown', e => {
-            if (gameState !== 'PLAYING') return;
-            const p = getPlayer();
-            if (!p || !p.alive) return;
-            const isSuper = e.button === 2;
-            const hasBall = activeMode === 'brawlball' && soccerBall && soccerBall.carrier === p;
-            if (isSuper && p.superCharge < 1.0 && !hasBall) return;
-
-            mouseAim.active = true; mouseAim.isSuper = isSuper; mouseAim.dragged = false;
-            mouseAim.startX = e.clientX; mouseAim.startY = e.clientY;
-            mouseAim.angle = p.facing; mouseAim.pullRatio = 0.75;
-        });
-
-        window.addEventListener('mousemove', e => {
-            if (!mouseAim.active) return;
-            const dx = e.clientX - mouseAim.startX, dy = e.clientY - mouseAim.startY;
-            const dist = Math.hypot(dx, dy);
-            if (dist > 14) { mouseAim.dragged = true; mouseAim.angle = Math.atan2(dy, dx); mouseAim.pullRatio = Math.min(1, dist / 140); }
-        });
-
-        window.addEventListener('mouseup', () => {
-            if (!mouseAim.active) return;
-            const p = getPlayer();
-            if (p && p.alive && gameState === 'PLAYING') {
-                const maxR = mouseAim.isSuper ? (p.spec.superRange || p.spec.range * 1.2) : p.spec.range;
-                if (!mouseAim.dragged) {
-                    const auto = getAutoAimTarget(p, maxR, true);
-                    executeAttack(p, auto.angle, mouseAim.isSuper, auto.dist);
-                } else {
-                    executeAttack(p, mouseAim.angle, mouseAim.isSuper, mouseAim.pullRatio * maxR);
-                }
-            }
-            mouseAim.active = false; mouseAim.dragged = false;
-        });
-        canvas.addEventListener('contextmenu', e => e.preventDefault());
 
         function gameLoop(timestamp) {
             if (!lastTime) lastTime = timestamp;
@@ -4590,12 +5072,347 @@
             requestAnimationFrame(gameLoop);
         }
 
-        window.onload = () => {
-            renderLobbyPreviews();
-            updateLobbyRankDisplay();
-            updateSelectedGadgetBanner(selectedBrawler);
-            requestAnimationFrame(gameLoop);
-        };
+        // ========================================================================
+        // 13. UI＆操作イベントバインディング
+        // ========================================================================
+        function setupControls() {
+            const leftTouchArea = document.getElementById('leftTouchArea');
+            const floatingBase = document.getElementById('floatingMoveBase');
+            const floatingKnob = document.getElementById('floatingMoveKnob');
+            const maxMoveDist = 42;
+
+            leftTouchArea.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (moveStick.active) return;
+                const t = e.changedTouches[0];
+                moveStick.active = true; moveStick.id = t.identifier;
+                moveStick.startX = t.clientX; moveStick.startY = t.clientY;
+                moveStick.dx = 0; moveStick.dy = 0;
+                floatingBase.style.left = `${t.clientX}px`; floatingBase.style.top = `${t.clientY}px`;
+                floatingBase.classList.remove('hidden'); floatingKnob.style.transform = 'translate(0px, 0px)';
+            }, { passive: false });
+
+            leftTouchArea.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (!moveStick.active) return;
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const t = e.changedTouches[i];
+                    if (t.identifier === moveStick.id) {
+                        const dx = t.clientX - moveStick.startX, dy = t.clientY - moveStick.startY;
+                        const dist = Math.hypot(dx, dy);
+                        const clamped = Math.min(dist, maxMoveDist);
+                        const ang = Math.atan2(dy, dx);
+                        moveStick.dx = dist > 4 ? (Math.cos(ang) * clamped) / maxMoveDist : 0;
+                        moveStick.dy = dist > 4 ? (Math.sin(ang) * clamped) / maxMoveDist : 0;
+                        floatingKnob.style.transform = `translate(${Math.cos(ang) * clamped}px, ${Math.sin(ang) * clamped}px)`;
+                        break;
+                    }
+                }
+            }, { passive: false });
+
+            const endMoveTouch = (e) => {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === moveStick.id) {
+                        moveStick.active = false; moveStick.id = null; moveStick.dx = 0; moveStick.dy = 0;
+                        floatingBase.classList.add('hidden'); floatingKnob.style.transform = 'translate(0px, 0px)';
+                    }
+                }
+            };
+            leftTouchArea.addEventListener('touchend', endMoveTouch);
+            leftTouchArea.addEventListener('touchcancel', endMoveTouch);
+
+            function bindActionStick(zoneId, knobId, isSuper) {
+                const zone = document.getElementById(zoneId);
+                const knob = document.getElementById(knobId);
+                const maxPull = 38;
+
+                zone.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    const p = getPlayer();
+                    if (!p || !p.alive || gameState !== 'PLAYING') return;
+                    if (isSuper && p.superCharge < 1.0) return;
+                    const t = e.changedTouches[0];
+                    attackStick.active = true; attackStick.id = t.identifier;
+                    attackStick.startX = t.clientX; attackStick.startY = t.clientY;
+                    attackStick.isSuper = isSuper; attackStick.dragged = false;
+                    attackStick.pullRatio = 0.65; attackStick.angle = p.facing;
+                }, { passive: false });
+
+                zone.addEventListener('touchmove', (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    if (!attackStick.active) return;
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const t = e.changedTouches[i];
+                        if (t.identifier === attackStick.id) {
+                            const dx = t.clientX - attackStick.startX, dy = t.clientY - attackStick.startY;
+                            const dist = Math.hypot(dx, dy);
+                            if (dist > 10) {
+                                attackStick.dragged = true; attackStick.angle = Math.atan2(dy, dx);
+                                attackStick.pullRatio = Math.min(1, dist / maxPull);
+                            }
+                            const clamped = Math.min(dist, maxPull);
+                            const a = Math.atan2(dy, dx);
+                            knob.style.transform = `translate(${Math.cos(a) * clamped}px, ${Math.sin(a) * clamped}px)`;
+                        }
+                    }
+                }, { passive: false });
+
+                const releaseStick = (e) => {
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        if (e.changedTouches[i].identifier === attackStick.id) {
+                            const p = getPlayer();
+                            if (p && p.alive && gameState === 'PLAYING') {
+                                const maxR = isSuper && p.spec.superRange ? p.spec.superRange : p.spec.range;
+                                if (!attackStick.dragged) {
+                                    const auto = getAutoAimTarget(p, maxR, true);
+                                    executeAttack(p, auto.angle, isSuper, auto.dist);
+                                } else {
+                                    executeAttack(p, attackStick.angle, isSuper, maxR * attackStick.pullRatio);
+                                }
+                            }
+                            attackStick.active = false; attackStick.id = null; knob.style.transform = 'translate(0px, 0px)';
+                        }
+                    }
+                };
+                zone.addEventListener('touchend', releaseStick);
+                zone.addEventListener('touchcancel', releaseStick);
+
+                zone.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                    const p = getPlayer();
+                    if (!p || !p.alive || gameState !== 'PLAYING') return;
+                    const maxR = isSuper && p.spec.superRange ? p.spec.superRange : p.spec.range;
+                    const auto = getAutoAimTarget(p, maxR, true);
+                    executeAttack(p, auto.angle, isSuper, auto.dist);
+                });
+            }
+
+            bindActionStick('attackStickZone', 'attackStickKnob', false);
+            bindActionStick('superStickZone', 'superStickKnob', true);
+
+            const gadgetBtn = document.getElementById('gadgetBtnZone');
+            gadgetBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault(); e.stopPropagation();
+                activateGadget(getPlayer());
+            }, { passive: false });
+            gadgetBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                activateGadget(getPlayer());
+            });
+
+            const hyperBtn = document.getElementById('hyperBtnZone');
+            hyperBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault(); e.stopPropagation();
+                activateHypercharge(getPlayer());
+            }, { passive: false });
+            hyperBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                activateHypercharge(getPlayer());
+            });
+
+            window.addEventListener('keydown', (e) => {
+                keys[e.code] = true;
+                if (e.code === 'Space' && gameState === 'PLAYING') {
+                    e.preventDefault();
+                    const p = getPlayer();
+                    if (p && p.superCharge >= 1.0) {
+                        const maxR = p.spec.superRange || p.spec.range;
+                        const auto = getAutoAimTarget(p, maxR, true);
+                        executeAttack(p, auto.angle, true, auto.dist);
+                    }
+                } else if (e.code === 'KeyG' && gameState === 'PLAYING') {
+                    e.preventDefault();
+                    activateGadget(getPlayer());
+                } else if (e.code === 'KeyH' && gameState === 'PLAYING') {
+                    e.preventDefault();
+                    activateHypercharge(getPlayer());
+                }
+            });
+            window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+            canvas.addEventListener('mousedown', (e) => {
+                if (gameState !== 'PLAYING') return;
+                const p = getPlayer();
+                if (!p || !p.alive) return;
+                const isSuper = (e.button === 2);
+                if (isSuper && p.superCharge < 1.0) return;
+
+                mouseAim.active = true; mouseAim.startX = e.clientX; mouseAim.startY = e.clientY;
+                mouseAim.isSuper = isSuper; mouseAim.dragged = false;
+                const worldX = camera.x + (e.clientX - canvas.width / 2) / camera.zoom;
+                const worldY = camera.y + (e.clientY - canvas.height / 2) / camera.zoom;
+                mouseAim.angle = Math.atan2(worldY - p.y, worldX - p.x);
+                const maxR = isSuper && p.spec.superRange ? p.spec.superRange : p.spec.range;
+                mouseAim.pullRatio = Math.min(1, Math.hypot(worldX - p.x, worldY - p.y) / maxR);
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!mouseAim.active) return;
+                const p = getPlayer();
+                if (!p) return;
+                if (Math.hypot(e.clientX - mouseAim.startX, e.clientY - mouseAim.startY) > 6) mouseAim.dragged = true;
+                const worldX = camera.x + (e.clientX - canvas.width / 2) / camera.zoom;
+                const worldY = camera.y + (e.clientY - canvas.height / 2) / camera.zoom;
+                mouseAim.angle = Math.atan2(worldY - p.y, worldX - p.x);
+                const maxR = mouseAim.isSuper && p.spec.superRange ? p.spec.superRange : p.spec.range;
+                mouseAim.pullRatio = Math.min(1, Math.hypot(worldX - p.x, worldY - p.y) / maxR);
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (!mouseAim.active) return;
+                const p = getPlayer();
+                if (p && p.alive && gameState === 'PLAYING') {
+                    const maxR = mouseAim.isSuper && p.spec.superRange ? p.spec.superRange : p.spec.range;
+                    if (!mouseAim.dragged) {
+                        const auto = getAutoAimTarget(p, maxR, true);
+                        executeAttack(p, auto.angle, mouseAim.isSuper, auto.dist);
+                    } else {
+                        executeAttack(p, mouseAim.angle, mouseAim.isSuper, maxR * mouseAim.pullRatio);
+                    }
+                }
+                mouseAim.active = false;
+            });
+            canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+            // ブロウラー選択カード
+            document.querySelectorAll('#brawlerSelectGrid .brawl-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    sound.init(); sound.playClick();
+                    document.querySelectorAll('#brawlerSelectGrid .brawl-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    selectedBrawler = card.dataset.brawler;
+                    const spec = BRAWLERS[selectedBrawler];
+                    if (spec) {
+                        document.getElementById('selectedGadgetBanner').textContent =
+                            `${spec.gadgetIcon} ガジェット：${spec.gadgetName}（${spec.gadgetDesc}／クールダウン制）`;
+                    }
+                    if (net.active && net.role === 'guest' && net.conn && net.connected) {
+                        try { net.conn.send({ type: 'HELLO_GUEST', brawler: selectedBrawler }); } catch (e) {}
+                    }
+                });
+            });
+
+            // 通常バトル / ガチバトル / オンライン対戦切替
+            const btnNormal = document.getElementById('btnQueueNormal');
+            const btnRanked = document.getElementById('btnQueueRanked');
+            const btnOnline = document.getElementById('btnQueueOnline');
+            const normalWrapper = document.getElementById('normalModeWrapper');
+            const rankedWrapper = document.getElementById('rankedInfoWrapper');
+            const onlineWrapper = document.getElementById('onlineLobbyWrapper');
+
+            const switchQueueTab = (tab) => {
+                sound.init(); sound.playClick();
+                queueType = tab;
+                btnNormal.classList.toggle('ring-2', tab === 'normal');
+                btnNormal.classList.toggle('ring-yellow-300', tab === 'normal');
+                btnNormal.classList.toggle('opacity-80', tab !== 'normal');
+
+                btnRanked.classList.toggle('ring-2', tab === 'ranked');
+                btnRanked.classList.toggle('ring-yellow-300', tab === 'ranked');
+                btnRanked.classList.toggle('opacity-80', tab !== 'ranked');
+
+                btnOnline.classList.toggle('ring-2', tab === 'online');
+                btnOnline.classList.toggle('ring-yellow-300', tab === 'online');
+                btnOnline.classList.toggle('opacity-80', tab !== 'online');
+
+                normalWrapper.classList.toggle('hidden', tab !== 'normal');
+                rankedWrapper.classList.toggle('hidden', tab !== 'ranked');
+                onlineWrapper.classList.toggle('hidden', tab !== 'online');
+            };
+
+            btnNormal.addEventListener('click', () => switchQueueTab('normal'));
+            btnRanked.addEventListener('click', () => switchQueueTab('ranked'));
+            btnOnline.addEventListener('click', () => switchQueueTab('online'));
+
+            // P2Pオンライン対戦ボタン
+            document.getElementById('btnCreateRoom').addEventListener('click', createOnlineRoom);
+            document.getElementById('btnJoinRoom').addEventListener('click', joinOnlineRoom);
+            document.getElementById('btnDisconnectP2P').addEventListener('click', () => {
+                sound.playClick();
+                cleanupP2P(false);
+            });
+            document.getElementById('btnCopyRoomCode').addEventListener('click', () => {
+                sound.playClick();
+                if (!net.roomCode) return;
+                const ta = document.createElement('textarea');
+                ta.value = net.roomCode;
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); } catch (e) {}
+                document.body.removeChild(ta);
+                setOnlineStatus(`📋 合言葉「${net.roomCode}」をクリップボードにコピーしました！`, 'text-yellow-300');
+            });
+
+            document.querySelectorAll('#modeSelectGrid .brawl-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    sound.init(); sound.playClick();
+                    document.querySelectorAll('#modeSelectGrid .brawl-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    selectedNormalMode = card.dataset.mode;
+                });
+            });
+
+            document.getElementById('btnStartBattle').addEventListener('click', startMatch);
+            document.getElementById('btnRetry').addEventListener('click', startMatch);
+
+            document.getElementById('btnBackHome').addEventListener('click', () => {
+                sound.playClick();
+                if (resultAnimFrameId) { cancelAnimationFrame(resultAnimFrameId); resultAnimFrameId = null; }
+                gameState = 'LOBBY';
+                document.getElementById('resultScreen').classList.add('hidden');
+                document.getElementById('topRightGlobalControls').classList.remove('hidden');
+                document.getElementById('lobbyScreen').classList.remove('hidden');
+                updateLobbyRankDisplay();
+            });
+
+            document.getElementById('btnReport').addEventListener('click', () => {
+                sound.playClick();
+                const toast = document.getElementById('reportToast');
+                toast.classList.remove('hidden');
+                setTimeout(() => toast.classList.add('hidden'), 2600);
+            });
+
+            document.getElementById('btnQuit').addEventListener('click', () => {
+                sound.playClick();
+                if (net.active) cleanupP2P(false);
+                gameState = 'LOBBY';
+                document.getElementById('battleHud').classList.add('hidden');
+                document.getElementById('btnQuit').classList.add('hidden');
+                document.getElementById('announceBanner').classList.add('hidden');
+                document.getElementById('centerSplash').classList.add('hidden');
+                document.getElementById('deadOverlayPanel').classList.add('hidden');
+                document.getElementById('lobbyScreen').classList.remove('hidden');
+                updateLobbyRankDisplay();
+            });
+
+            document.getElementById('btnMute').addEventListener('click', () => {
+                sound.init();
+                const muted = sound.toggleMute();
+                document.getElementById('muteIcon').textContent = muted ? '🔇' : '🔊';
+            });
+
+            document.getElementById('btnProfileOpen').addEventListener('click', () => {
+                sound.init(); sound.playClick();
+                const st = getRankState(profile.rp);
+                document.getElementById('modalRankName').textContent = st.name;
+                document.getElementById('modalRankPoints').textContent = `${profile.rp} RP / 🏆 ${profile.trophies || 0}`;
+                const rate = profile.matches > 0 ? Math.round((profile.wins / profile.matches) * 100) : 0;
+                document.getElementById('modalMatches').textContent = `${profile.matches}戦 ${profile.wins}勝 (勝率 ${rate}%)`;
+                document.getElementById('modalKills').textContent = `${profile.kills} 撃破`;
+                document.getElementById('profileModal').classList.remove('hidden');
+            });
+
+            document.getElementById('btnCloseProfile').addEventListener('click', () => {
+                sound.playClick();
+                document.getElementById('profileModal').classList.add('hidden');
+            });
+        }
+
+        // 起動初期化
+        updateLobbyRankDisplay();
+        renderLobbyPreviews();
+        setupControls();
+        requestAnimationFrame(gameLoop);
     })();
     </script>
 </body>
